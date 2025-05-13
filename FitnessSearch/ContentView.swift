@@ -46,14 +46,14 @@ struct ContentView: View {
                 
                 VStack(alignment: .leading) {
                     if viewModel.result.isEmpty {
-                        ForEach(viewModel.exercises[..<min(20, viewModel.exercises.count)]) { exercise in
-                            HStack{
-                                Text(exercise.name)
-                                if let muscleGroup = exercise.muscleGroup {
-                                    Text(muscleGroup)
-                                }
-                            }
-                        }
+//                        ForEach(viewModel.exercises[..<min(20, viewModel.exercises.count)]) { exercise in
+//                            HStack{
+//                                Text(exercise.name)
+//                                if let muscleGroup = exercise.muscleGroup {
+//                                    Text(muscleGroup)
+//                                }
+//                            }
+//                        }
                     } else {
                         ForEach(viewModel.result) { result in
                             HStack {
@@ -85,14 +85,15 @@ final class ContentViewModel: @unchecked Sendable {
     var dbInitalized = false
     var classifierInitialized = false
     
-    var exercises: [Exercise] = []
-    var result: [QueryResult] = []
+    var exercises: [ExerciseContainer] = []
+    var result: [ExerciseContainer] = []
     var query: String = ""
     var queryThrottled: String = ""
     
-    struct QueryResult: Identifiable {
+    struct ExerciseContainer: Identifiable {
         let exercise: Exercise
         let similarity: Float
+        let embeddings: Embeddings?
         var id: String {
             exercise.id
         }
@@ -145,13 +146,15 @@ final class ContentViewModel: @unchecked Sendable {
                     return
                 }
                 
-                var result = [QueryResult]()
+                var result = [ExerciseContainer]()
                 for exercise in exercises {
                     guard let embeddings = exercise.embeddings else {
                         continue
                     }
                     
-                    result.append(QueryResult(exercise: exercise, similarity: ClassifierModel.cosineSimilarity(input, embeddings)))
+                    let similarity = ClassifierModel.cosineSimilarity(input, embeddings.nameEmbeddings)
+                    
+                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, embeddings: nil))
                 }
                 
                 self.result = Array(result.sorted(by: { a, b in
@@ -170,28 +173,44 @@ final class ContentViewModel: @unchecked Sendable {
             let dataModel = await dataModel?.get()
             let classifierModel = await classifierModel?.get()
             
-            self.exercises = dataModel?.exercises() ?? []
-            
+            guard let dataModel, let classifierModel else {
+                return
+            }
+                        
             let clock = ContinuousClock()
             let start = clock.now
             print("Starting Classification")
-            for i in 0..<exercises.count {
-                if self.exercises[i].embeddings == nil {
+            
+            let exercises = dataModel.exercises()
+            self.exercises = []
+            
+            var batchStart = clock.now
+            var loaded = 0
+            var calculated = 0
+            for (i, exercise) in exercises.enumerated() {
+                if let embeddings = dataModel.embedding(exerciseName: exercise.name) {
+                    loaded += 1
+                    self.exercises.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
+                } else {
                     do {
-                        let clock = ContinuousClock()
-                        let start = clock.now
-                        let embeddings = try classifierModel?.embeddings(text: self.exercises[i].textToEmbed)
-                        self.exercises[i].embeddings = embeddings
-//                        dataModel?.save(exercise: self.exercises[i])
-                        let duration = clock.now - start
-                        if i % 10 == 0 {
-                            print("Classified \(i)/\(exercises.count) (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
-                        }
+                        let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
+                        let embeddings = Embeddings(exerciseName: exercise.name, nameEmbeddings: nameEmbedding)
+                        dataModel.save(embeddings: embeddings)
+                        self.exercises.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
                     } catch {
                         print(error)
                     }
+                    calculated += 1
+                }
+                if i > 0 && i % 10 == 0 {
+                    let duration = clock.now - batchStart
+                    print("Classified \(i) loaded:\(loaded) calculated:\(calculated) (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
+                    batchStart = clock.now
+                    loaded = 0
+                    calculated = 0
                 }
             }
+            
             let duration = clock.now - start
             print("Ending (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
         }

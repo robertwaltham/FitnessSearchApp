@@ -20,6 +20,7 @@ final class DataModel: Sendable {
 //        } else {
             FileManager.default.copyFileToDocumentsFolder(nameForFile: "db", extForFile: "sqlite3")
             db = DataModel.connect()
+            createTables()
 //        }
     }
 
@@ -46,6 +47,7 @@ final class DataModel: Sendable {
     fileprivate func createTables() {
         do {
             try Exercise.createTable(db: db)
+            try Embeddings.createTable(db: db)
         } catch {
             fatalError(error.localizedDescription)
         }
@@ -65,7 +67,25 @@ extension DataModel {
         do {
             return try Exercise.queryAll(db: db)
         } catch {
-            fatalError(error.localizedDescription)
+            print(error)
+        }
+        return []
+    }
+    
+    func embedding(exerciseName: String) -> Embeddings? {
+        do {
+            return try Embeddings.load(name: exerciseName, db: db)
+        } catch {
+            print(error)
+        }
+        return nil
+    }
+    
+    func save(embeddings: Embeddings) {
+        do {
+            try embeddings.save(db: db)
+        } catch {
+            print(error)
         }
     }
 }
@@ -79,7 +99,7 @@ extension DataModel {
   "load_position_end" TEXT, "continuous_or_alternating_legs" TEXT, "foot_elevation" TEXT, "combination_exercises" TEXT,
   "movement_pattern_1" TEXT, "movement_pattern_2" TEXT, "movement_pattern_3" TEXT, "plane_of_motion_1" TEXT,
   "plane_of_motion_2" TEXT, "plane_of_motion_3" TEXT, "body_region" TEXT, "force_type" TEXT,
-  "mechanics" TEXT, "laterality" TEXT, "primary_exercise_classification" TEXT, embeddings BLOB);
+  "mechanics" TEXT, "laterality" TEXT, "primary_exercise_classification" TEXT);
  */
 
 struct Exercise: Identifiable {
@@ -113,11 +133,6 @@ struct Exercise: Identifiable {
         Expression<String?>("tertiary_muscle")
     }
     
-    var embeddings: MLMultiArray?
-    fileprivate static var embeddingsExp: SQLite.Expression<MLMultiArray?> {
-        Expression<MLMultiArray?>("embeddings")
-    }
-    
     var textToEmbed: String {
         return "\(name) \(muscleGroup ?? "") \(primaryMuscle ?? "") \(secondaryMuscle ?? "") \(tertiaryMuscle ?? "")"
     }
@@ -129,12 +144,11 @@ struct Exercise: Identifiable {
     fileprivate static func createTable(db: Connection) throws {
         try db.run(
             table().create(ifNotExists: true) { t in
-                t.column(nameExp, primaryKey: true)
+                t.column(nameExp)
                 t.column(muscleGroupExp)
                 t.column(primaryMuscleExp)
                 t.column(secondaryMuscleExp)
                 t.column(tertiaryMuscleExp)
-                t.column(embeddingsExp)
             }
         )
     }
@@ -147,7 +161,6 @@ struct Exercise: Identifiable {
                 Exercise.primaryMuscleExp <- primaryMuscle,
                 Exercise.secondaryMuscleExp <- secondaryMuscle,
                 Exercise.tertiaryMuscleExp <- tertiaryMuscle,
-                Exercise.embeddingsExp <- embeddings
             )
         )
     }
@@ -158,9 +171,49 @@ struct Exercise: Identifiable {
                      muscleGroup: row[muscleGroupExp],
                      primaryMuscle: row[primaryMuscleExp],
                      secondaryMuscle: row[secondaryMuscleExp],
-                     tertiaryMuscle: row[tertiaryMuscleExp],
-                     embeddings: row[embeddingsExp])
+                     tertiaryMuscle: row[tertiaryMuscleExp])
         }
+    }
+}
+
+struct Embeddings {
+    
+    fileprivate static func table() -> Table {
+        return Table("embeddings")
+    }
+    
+    var exerciseName: String
+    fileprivate static var exerciseNameExp: SQLite.Expression<String> {
+        Expression<String>("exercise_name")
+    }
+    
+    var nameEmbeddings: MLMultiArray
+    fileprivate static var nameEmbeddingsExp: SQLite.Expression<MLMultiArray> {
+        Expression<MLMultiArray>("exercise_embeddings")
+    }
+    
+    fileprivate static func createTable(db: Connection) throws {
+        try db.run(
+            table().create(ifNotExists: true) { t in
+                t.column(exerciseNameExp, primaryKey: true)
+                t.column(nameEmbeddingsExp)
+            }
+        )
+    }
+    
+    fileprivate func save(db: Connection) throws {
+        try db.run(
+            Embeddings.table().insert(or: .replace,
+                Embeddings.exerciseNameExp <- exerciseName,
+                Embeddings.nameEmbeddingsExp <- nameEmbeddings
+            )
+        )
+    }
+    
+    fileprivate static func load(name: String, db: Connection) throws -> Embeddings? {
+        try db.prepare(table().filter(exerciseNameExp == name)).map { row in
+            Embeddings(exerciseName: row[exerciseNameExp], nameEmbeddings: row[nameEmbeddingsExp])
+        }.first
     }
 }
 
@@ -184,7 +237,6 @@ extension FileManager {
     }
 }
 
-// TODO: FIX doesn't work on loading
 extension MLMultiArray: @retroactive Expressible {}
 extension MLMultiArray: @retroactive Value {
     public class var declaredDatatype: String {
@@ -192,7 +244,7 @@ extension MLMultiArray: @retroactive Value {
     }
     public class func fromDatatypeValue(_ blobValue: Blob) -> MLMultiArray {
         do {
-            return try NSKeyedUnarchiver(forReadingFrom: Data.fromDatatypeValue(blobValue)).decodeObject() as? MLMultiArray ?? MLMultiArray()
+            return try NSKeyedUnarchiver.unarchivedObject(ofClass: MLMultiArray.self, from: Data.fromDatatypeValue(blobValue))!
         } catch {
             fatalError("can't load value")
         }
