@@ -13,6 +13,7 @@ final class DataModel: Sendable {
     
     private static let filename = "db.sqlite3"
     
+    // TODO: data subset for previews
     init(testing: Bool = false) {
 //        if testing {
 //            db = DataModel.connectForTesting()

@@ -44,30 +44,31 @@ struct ContentView: View {
                 .background(Color(white: 0.8))
                 .clipShape(RoundedRectangle(cornerRadius: 5))
                 
-                VStack(alignment: .leading) {
-                    if viewModel.result.isEmpty {
-//                        ForEach(viewModel.exercises[..<min(20, viewModel.exercises.count)]) { exercise in
-//                            HStack{
-//                                Text(exercise.name)
-//                                if let muscleGroup = exercise.muscleGroup {
-//                                    Text(muscleGroup)
-//                                }
-//                            }
-//                        }
-                    } else {
-                        ForEach(viewModel.result) { result in
-                            HStack {
-                                Text(result.similarity.formatted(.number.precision(.fractionLength(1...2))))
-                                Text(result.exercise.name)
-                                if let muscleGroup = result.exercise.muscleGroup {
-                                    Text(muscleGroup)
+                
+                ScrollView {
+                    LazyVStack(alignment: .leading) {
+                        if viewModel.result.isEmpty {
+                            ForEach(viewModel.exercises) { element in
+                                HStack{
+                                    Text(element.exercise.name)
+                                    if let muscleGroup = element.exercise.muscleGroup {
+                                        Text(muscleGroup)
+                                    }
+                                }
+                            }
+                        } else {
+                            ForEach(viewModel.result) { result in
+                                HStack {
+                                    Text(result.similarity.formatted(.number.precision(.fractionLength(1...2))))
+                                    Text(result.exercise.name)
+                                    if let muscleGroup = result.exercise.muscleGroup {
+                                        Text(muscleGroup)
+                                    }
                                 }
                             }
                         }
                     }
                 }
-
-                
           
                 Spacer()
             }
@@ -159,7 +160,7 @@ final class ContentViewModel: @unchecked Sendable {
                 
                 self.result = Array(result.sorted(by: { a, b in
                     return a.similarity > b.similarity
-                })[..<min(20, result.count)])
+                })[..<min(50, result.count)])
 
             } catch {
                 print(error.localizedDescription)
@@ -169,9 +170,9 @@ final class ContentViewModel: @unchecked Sendable {
     }
     
     func loadModels() {
-        Task {
-            let dataModel = await dataModel?.get()
-            let classifierModel = await classifierModel?.get()
+        Task.detached {
+            let dataModel = await self.dataModel?.get()
+            let classifierModel = await self.classifierModel?.get()
             
             guard let dataModel, let classifierModel else {
                 return
@@ -187,16 +188,17 @@ final class ContentViewModel: @unchecked Sendable {
             var batchStart = clock.now
             var loaded = 0
             var calculated = 0
+            var batch = [ExerciseContainer]()
             for (i, exercise) in exercises.enumerated() {
                 if let embeddings = dataModel.embedding(exerciseName: exercise.name) {
                     loaded += 1
-                    self.exercises.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
+                    batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
                 } else {
                     do {
                         let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
                         let embeddings = Embeddings(exerciseName: exercise.name, nameEmbeddings: nameEmbedding)
                         dataModel.save(embeddings: embeddings)
-                        self.exercises.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
+                        batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
                     } catch {
                         print(error)
                     }
@@ -208,8 +210,13 @@ final class ContentViewModel: @unchecked Sendable {
                     batchStart = clock.now
                     loaded = 0
                     calculated = 0
+                    self.exercises.append(contentsOf: batch)
+                    batch = []
                 }
             }
+            
+            self.exercises.append(contentsOf: batch)
+            batch = []
             
             let duration = clock.now - start
             print("Ending (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
