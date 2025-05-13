@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = D11311562DD2A6D20062B8C4 /* SQLite */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		D11311472DD2A6AC0062B8C4 /* FitnessSearch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FitnessSearch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = FitnessSearch;
 			packageProductDependencies = (
+				D11311562DD2A6D20062B8C4 /* SQLite */,
 			);
 			productName = FitnessSearch;
 			productReference = D11311472DD2A6AC0062B8C4 /* FitnessSearch.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = D113113E2DD2A6AC0062B8C4;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D11311482DD2A6AC0062B8C4 /* Products */;
 			projectDirPath = "";
@@ -269,7 +278,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.leveltenpaladin.FitnessSearch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -297,7 +307,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.leveltenpaladin.FitnessSearch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -324,6 +335,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D11311562DD2A6D20062B8C4 /* SQLite */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */;
+			productName = SQLite;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D113113F2DD2A6AC0062B8C4 /* Project object */;
 }
