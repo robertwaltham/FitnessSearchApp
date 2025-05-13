@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = D11311562DD2A6D20062B8C4 /* SQLite */; };
+		D193024B2DD3F9BD00B373BC /* SwiftNormalization in Frameworks */ = {isa = PBXBuildFile; productRef = D193024A2DD3F9BD00B373BC /* SwiftNormalization */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D193024B2DD3F9BD00B373BC /* SwiftNormalization in Frameworks */,
 				D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +73,7 @@
 			name = FitnessSearch;
 			packageProductDependencies = (
 				D11311562DD2A6D20062B8C4 /* SQLite */,
+				D193024A2DD3F9BD00B373BC /* SwiftNormalization */,
 			);
 			productName = FitnessSearch;
 			productReference = D11311472DD2A6AC0062B8C4 /* FitnessSearch.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */,
+				D19302492DD3F9BD00B373BC /* XCRemoteSwiftPackageReference "SwiftNormalization" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D11311482DD2A6AC0062B8C4 /* Products */;
@@ -345,6 +349,14 @@
 				minimumVersion = 0.15.3;
 			};
 		};
+		D19302492DD3F9BD00B373BC /* XCRemoteSwiftPackageReference "SwiftNormalization" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/JacopoMangiavacchi/SwiftNormalization";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -352,6 +364,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */;
 			productName = SQLite;
+		};
+		D193024A2DD3F9BD00B373BC /* SwiftNormalization */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D19302492DD3F9BD00B373BC /* XCRemoteSwiftPackageReference "SwiftNormalization" */;
+			productName = SwiftNormalization;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,5 +1,5 @@
 {
-  "originHash" : "42598adf0e546dd7490b40b2fd0f5298dee9c098f71dcdbfcb5cc4c07573f374",
+  "originHash" : "6d2fbfac88281869fa7fc9c673fa5fb8d52cf573f8fda1907aa2125ac4a0a7b3",
   "pins" : [
     {
       "identity" : "sqlite.swift",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "a95fc6df17d108bd99210db5e8a9bac90fe984b8",
         "version" : "0.15.3"
+      }
+    },
+    {
+      "identity" : "swiftnormalization",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/JacopoMangiavacchi/SwiftNormalization",
+      "state" : {
+        "revision" : "8fa4f7850e0bd56966f306ec874f916494059246",
+        "version" : "0.1.0"
       }
     }
   ],

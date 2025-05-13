@@ -9,6 +9,7 @@ import SwiftUI
 import Observation
 import Combine
 import CoreML
+import SwiftNormalization
 
 struct ContentView: View {
     @State var viewModel: ContentViewModel
@@ -69,7 +70,6 @@ struct ContentView: View {
                                     if let muscleGroup = result.exercise.muscleGroup {
                                         Text(muscleGroup)
                                     }
-                                    Text(result.garbageSimilarty.formatted(.number.precision(.fractionLength(1...2))))
                                 }
                             }
                         }
@@ -100,7 +100,6 @@ final class ContentViewModel: @unchecked Sendable {
     struct ExerciseContainer: Identifiable {
         let exercise: Exercise
         let similarity: Float
-        let garbageSimilarty: Float
         let embeddings: Embeddings?
         var id: String {
             exercise.id
@@ -154,6 +153,7 @@ final class ContentViewModel: @unchecked Sendable {
             do {
                 let input = try classifierModel.embeddings(text: query)
                 let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
+                let diff = try input.subtract(other: garbage)
                 
                 var result = [ExerciseContainer]()
                 for exercise in exercises {
@@ -161,14 +161,13 @@ final class ContentViewModel: @unchecked Sendable {
                         continue
                     }
                     
-                    let similarity = ClassifierModel.cosineSimilarity(input, embeddings.nameEmbeddings)
-                    let garbageSimilarity = ClassifierModel.cosineSimilarity(garbage, embeddings.nameEmbeddings)
+                    let similarity = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
                     
-                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, garbageSimilarty: garbageSimilarity, embeddings: nil))
+                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, embeddings: nil))
                 }
                 
                 result = result.filter({ element in
-                    element.similarity > 0.5 && abs(element.similarity - element.garbageSimilarty) > 0.05
+                    element.similarity > 0.1
                 })
                 
                 self.result = Array(result.sorted(by: { a, b in
@@ -204,13 +203,13 @@ final class ContentViewModel: @unchecked Sendable {
             for (i, exercise) in exercises.enumerated() {
                 if let embeddings = dataModel.embedding(exerciseName: exercise.name) {
                     loaded += 1
-                    batch.append(ExerciseContainer(exercise: exercise, similarity: 0, garbageSimilarty: 0, embeddings: embeddings))
+                    batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
                 } else {
                     do {
                         let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
                         let embeddings = Embeddings(exerciseName: exercise.name, nameEmbeddings: nameEmbedding)
                         dataModel.save(embeddings: embeddings)
-                        batch.append(ExerciseContainer(exercise: exercise, similarity: 0, garbageSimilarty: 0, embeddings: embeddings))
+                        batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
                     } catch {
                         print(error)
                     }
@@ -240,11 +239,35 @@ final class ContentViewModel: @unchecked Sendable {
     ContentView(viewModel: ContentViewModel(testing: true))
 }
 
-//extension MLMultiArray {
-//    func printContents() {
-//        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
-//            Array(ptr)
-//        }
-//        print(e1)
-//    }
-//}
+extension MLMultiArray {
+    func printContents() {
+        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
+            Array(ptr)
+        }
+        print(e1)
+    }
+    
+    func subtract(other: MLMultiArray) throws -> MLMultiArray {
+        
+        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
+            Array(ptr)
+        }
+        
+        let e2 = other.withUnsafeBufferPointer(ofType: Float.self) { ptr in
+            Array(ptr)
+        }
+
+        let sub = zip(e1, e2).map { (a, b) in
+            a - b
+        }
+        var normalizer = L1Normalizer<Float>()
+        let normalized = normalizer.normalized(sub)
+        
+        let result = try MLMultiArray(shape: [512], dataType: .float32)
+        for (i, e) in normalized.enumerated() {
+            result[i] = NSNumber(value: e)
+        }
+        
+        return result
+    }
+}
