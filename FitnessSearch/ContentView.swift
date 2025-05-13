@@ -8,6 +8,7 @@
 import SwiftUI
 import Observation
 import Combine
+import CoreML
 
 struct ContentView: View {
     @State var viewModel: ContentViewModel
@@ -38,7 +39,11 @@ struct ContentView: View {
                         ) { debouncedSearchText in
                             viewModel.processQuery()
                         }
-                    Text(viewModel.exercises.count.description)
+                    if viewModel.result.isEmpty {
+                        Text(viewModel.exercises.count.description)
+                    } else {
+                        Text(viewModel.result.count.description)
+                    }
                 }
                 .padding()
                 .background(Color(white: 0.8))
@@ -64,6 +69,7 @@ struct ContentView: View {
                                     if let muscleGroup = result.exercise.muscleGroup {
                                         Text(muscleGroup)
                                     }
+                                    Text(result.garbageSimilarty.formatted(.number.precision(.fractionLength(1...2))))
                                 }
                             }
                         }
@@ -94,6 +100,7 @@ final class ContentViewModel: @unchecked Sendable {
     struct ExerciseContainer: Identifiable {
         let exercise: Exercise
         let similarity: Float
+        let garbageSimilarty: Float
         let embeddings: Embeddings?
         var id: String {
             exercise.id
@@ -131,7 +138,9 @@ final class ContentViewModel: @unchecked Sendable {
         
         Task {
             
-            let classifierModel = await classifierModel?.get()
+            guard let classifierModel = await classifierModel?.get() else {
+                return
+            }
             
             let clock = ContinuousClock()
             let start = clock.now
@@ -143,9 +152,8 @@ final class ContentViewModel: @unchecked Sendable {
             }
             
             do {
-                guard let input = try classifierModel?.embeddings(text: query) else {
-                    return
-                }
+                let input = try classifierModel.embeddings(text: query)
+                let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
                 
                 var result = [ExerciseContainer]()
                 for exercise in exercises {
@@ -154,9 +162,14 @@ final class ContentViewModel: @unchecked Sendable {
                     }
                     
                     let similarity = ClassifierModel.cosineSimilarity(input, embeddings.nameEmbeddings)
+                    let garbageSimilarity = ClassifierModel.cosineSimilarity(garbage, embeddings.nameEmbeddings)
                     
-                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, embeddings: nil))
+                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, garbageSimilarty: garbageSimilarity, embeddings: nil))
                 }
+                
+                result = result.filter({ element in
+                    element.similarity > 0.5 && abs(element.similarity - element.garbageSimilarty) > 0.05
+                })
                 
                 self.result = Array(result.sorted(by: { a, b in
                     return a.similarity > b.similarity
@@ -165,7 +178,6 @@ final class ContentViewModel: @unchecked Sendable {
             } catch {
                 print(error.localizedDescription)
             }
-
         }
     }
     
@@ -192,13 +204,13 @@ final class ContentViewModel: @unchecked Sendable {
             for (i, exercise) in exercises.enumerated() {
                 if let embeddings = dataModel.embedding(exerciseName: exercise.name) {
                     loaded += 1
-                    batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
+                    batch.append(ExerciseContainer(exercise: exercise, similarity: 0, garbageSimilarty: 0, embeddings: embeddings))
                 } else {
                     do {
                         let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
                         let embeddings = Embeddings(exerciseName: exercise.name, nameEmbeddings: nameEmbedding)
                         dataModel.save(embeddings: embeddings)
-                        batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
+                        batch.append(ExerciseContainer(exercise: exercise, similarity: 0, garbageSimilarty: 0, embeddings: embeddings))
                     } catch {
                         print(error)
                     }
@@ -227,3 +239,12 @@ final class ContentViewModel: @unchecked Sendable {
 #Preview {
     ContentView(viewModel: ContentViewModel(testing: true))
 }
+
+//extension MLMultiArray {
+//    func printContents() {
+//        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
+//            Array(ptr)
+//        }
+//        print(e1)
+//    }
+//}

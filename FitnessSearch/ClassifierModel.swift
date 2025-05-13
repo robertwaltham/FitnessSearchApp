@@ -8,12 +8,14 @@ import CoreML
 
 final class ClassifierModel: @unchecked Sendable {
     
-    let textEncoder: mobileclip_s0_text
+//    let textEncoder: mobileclip_s0_text
+    let textEncoder: mobileclip_blt_text
     let tokenizer: CLIPTokenizer
     
     init() {
         do {
-            try textEncoder = mobileclip_s0_text()
+//            try textEncoder = mobileclip_s0_text()
+            try textEncoder = mobileclip_blt_text()
             tokenizer = CLIPTokenizer()
         } catch {
             fatalError(error.localizedDescription)
