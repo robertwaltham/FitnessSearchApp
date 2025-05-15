@@ -38,7 +38,6 @@ struct ContentView: View {
                             searchTextPublisher
                                 .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
                         ) { debouncedSearchText in
-                            viewModel.testShader()
                             viewModel.processQuery()
                         }
                     if viewModel.result.isEmpty {
@@ -157,6 +156,11 @@ final class ContentViewModel: @unchecked Sendable {
         
         Task {
             
+            // TODO: wait for inputs to be loaded
+            guard let service = await self.shaderService?.get() else {
+                return
+            }
+            
             guard let classifierModel = await classifierModel?.get() else {
                 return
             }
@@ -170,34 +174,54 @@ final class ContentViewModel: @unchecked Sendable {
                 print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
             }
             
-            do {
-                let input = try classifierModel.embeddings(text: query)
-                let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
-                let diff = try input.subtract(other: garbage)
-                
-                var result = [ExerciseContainer]()
-                for exercise in exercises {
-                    guard let embeddings = exercise.embeddings else {
-                        continue
-                    }
-                    
-                    let similarity = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
-                    
-                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, embeddings: nil))
-                }
-                
-                result = result.filter({ element in
-                    element.similarity > 0.1
-                })
-                
-                self.result = Array(result.sorted(by: { a, b in
-                    return a.similarity > b.similarity
-                })[..<min(50, result.count)])
-
-            } catch {
-                print(error.localizedDescription)
-            }
+            let input = try classifierModel.embeddings(text: query)
+            let result = service.search(input)
+            print(result)
         }
+        
+//        Task {
+//            
+//            guard let classifierModel = await classifierModel?.get() else {
+//                return
+//            }
+//            
+//            let clock = ContinuousClock()
+//            let start = clock.now
+//            print("Starting Query")
+//
+//            defer {
+//                let duration = clock.now - start
+//                print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
+//            }
+//            
+//            do {
+//                let input = try classifierModel.embeddings(text: query)
+//                let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
+//                let diff = try input.subtract(other: garbage)
+//                
+//                var result = [ExerciseContainer]()
+//                for exercise in exercises {
+//                    guard let embeddings = exercise.embeddings else {
+//                        continue
+//                    }
+//                    
+//                    let similarity = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
+//                    
+//                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, embeddings: nil))
+//                }
+//                
+//                result = result.filter({ element in
+//                    element.similarity > 0.1
+//                })
+//                
+//                self.result = Array(result.sorted(by: { a, b in
+//                    return a.similarity > b.similarity
+//                })[..<min(50, result.count)])
+//
+//            } catch {
+//                print(error.localizedDescription)
+//            }
+//        }
     }
     
     func loadModels() {
@@ -251,6 +275,20 @@ final class ContentViewModel: @unchecked Sendable {
             
             let duration = clock.now - start
             print("Ending (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
+            
+            batchStart = clock.now
+            print("starting shader setup")
+            
+            guard let service = await self.shaderService?.get() else {
+                return
+            }
+            
+            let embeddings = self.exercises.compactMap {$0.embeddings}.map {$0.nameEmbeddings}
+            service.createBuffers(embeddingsCount: self.exercises.count)
+            service.copyInput(embeddings: embeddings)
+            let shaderDuration = clock.now - start
+            print("Ending (took \(shaderDuration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
+            
         }
     }
 }
