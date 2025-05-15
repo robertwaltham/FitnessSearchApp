@@ -97,6 +97,7 @@ class ShaderService: @unchecked Sendable {
             guard var pipeline, let inputBuffer, let outputBuffer, let searchBuffer else {
                 fatalError("couldn't create pipeline, or buffers not initalized")
             }
+            
             let embSize = MemoryLayout<Float>.stride * embeddingsSize
 
             _ = embedding.withUnsafeBytes { ptr in

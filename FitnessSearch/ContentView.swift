@@ -55,32 +55,41 @@ struct ContentView: View {
                     LazyVStack(alignment: .leading) {
                         if viewModel.result.isEmpty {
                             ForEach(viewModel.exercises) { element in
-                                HStack{
-                                    Text(element.exercise.name)
-                                    if let muscleGroup = element.exercise.muscleGroup {
-                                        Text(muscleGroup)
-                                    }
-                                }
+                                exerciseRow(element.exercise)
                             }
                         } else {
                             ForEach(viewModel.result) { result in
-                                HStack {
-                                    Text(result.similarity.formatted(.number.precision(.fractionLength(1...2))))
-                                    Text(result.exercise.name)
-                                    if let muscleGroup = result.exercise.muscleGroup {
-                                        Text(muscleGroup)
-                                    }
-                                }
+                                exerciseRow(viewModel.exercises[result.index].exercise, similarity: result.score)
                             }
                         }
                     }
                 }
-          
+                
                 Spacer()
             }
-
+            
         }
         .padding()
+    }
+    
+    @ViewBuilder
+    func exerciseRow(_ exercise: Exercise, similarity: Float? = nil) -> some View {
+        if let similarity {
+            HStack{
+                Text(exercise.name)
+                if let muscleGroup = exercise.muscleGroup {
+                    Text(muscleGroup)
+                }
+                Text(similarity.formatted(.number.precision(.fractionLength(1...2))))
+            }
+        } else {
+            HStack{
+                Text(exercise.name)
+                if let muscleGroup = exercise.muscleGroup {
+                    Text(muscleGroup)
+                }
+            }
+        }
     }
 }
 
@@ -89,22 +98,29 @@ final class ContentViewModel: @unchecked Sendable {
     var dataModel: AsyncFactory<DataModel>? = nil
     var classifierModel: AsyncFactory<ClassifierModel>? = nil
     var shaderService: AsyncFactory<ShaderService>? = nil
-
+    
     var dbInitalized = false
     var classifierInitialized = false
     
     var exercises: [ExerciseContainer] = []
-    var result: [ExerciseContainer] = []
+    var result: [Result] = []
     var query: String = ""
     var queryThrottled: String = ""
     
     struct ExerciseContainer: Identifiable {
         let exercise: Exercise
-        let similarity: Float
         let embeddings: Embeddings?
         var id: String {
             exercise.id
         }
+    }
+    
+    struct Result: Identifiable {
+        let index: Int
+        var id: Int {
+            index
+        }
+        var score: Float
     }
     
     init(testing: Bool = false) {
@@ -119,7 +135,7 @@ final class ContentViewModel: @unchecked Sendable {
         } set: { value in
             self.classifierInitialized = value
         }
-
+        
         self.dataModel = AsyncFactory(binding: dataModelBinding) {
             DataModel(testing: testing)
         }
@@ -148,7 +164,9 @@ final class ContentViewModel: @unchecked Sendable {
         }
     }
     
+    // search using compute shader
     func processQuery() {
+        
         guard !query.isEmpty else {
             result = []
             return
@@ -168,60 +186,67 @@ final class ContentViewModel: @unchecked Sendable {
             let clock = ContinuousClock()
             let start = clock.now
             print("Starting Query")
-
+            
             defer {
                 let duration = clock.now - start
                 print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
             }
             
             let input = try classifierModel.embeddings(text: query)
-            let result = service.search(input)
-            print(result)
+            let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
+            let diff = try input.subtract(other: garbage)
+            
+            let result = service.search(diff)
+            self.result = result.enumerated().filter( { $0.element > 0.09 }).sorted(by: { $0.element > $1.element }).map({ Result(index: $0.offset, score: $0.element)})
         }
-        
-//        Task {
-//            
-//            guard let classifierModel = await classifierModel?.get() else {
-//                return
-//            }
-//            
-//            let clock = ContinuousClock()
-//            let start = clock.now
-//            print("Starting Query")
-//
-//            defer {
-//                let duration = clock.now - start
-//                print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
-//            }
-//            
-//            do {
-//                let input = try classifierModel.embeddings(text: query)
-//                let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
-//                let diff = try input.subtract(other: garbage)
-//                
-//                var result = [ExerciseContainer]()
-//                for exercise in exercises {
-//                    guard let embeddings = exercise.embeddings else {
-//                        continue
-//                    }
-//                    
-//                    let similarity = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
-//                    
-//                    result.append(ExerciseContainer(exercise: exercise.exercise, similarity: similarity, embeddings: nil))
-//                }
-//                
-//                result = result.filter({ element in
-//                    element.similarity > 0.1
-//                })
-//                
-//                self.result = Array(result.sorted(by: { a, b in
-//                    return a.similarity > b.similarity
-//                })[..<min(50, result.count)])
-//
-//            } catch {
-//                print(error.localizedDescription)
-//            }
-//        }
+    }
+    
+    // search using cpu
+    
+    func processQuerySlow() {
+        Task {
+            
+            guard let classifierModel = await classifierModel?.get() else {
+                return
+            }
+            
+            let clock = ContinuousClock()
+            let start = clock.now
+            print("Starting Query")
+            
+            defer {
+                let duration = clock.now - start
+                print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
+            }
+            
+            do {
+                let input = try classifierModel.embeddings(text: query)
+                let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
+                let diff = try input.subtract(other: garbage)
+                
+                var result = [Result]()
+                for (i, exercise) in exercises.enumerated() {
+                    guard let embeddings = exercise.embeddings else {
+                        continue
+                    }
+                    
+                    let similarity = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
+                    
+                    result.append(Result(index: i, score: similarity))
+                }
+                
+                result = result.filter({ element in
+                    element.score > 0.09
+                })
+                
+                self.result = Array(result.sorted(by: { a, b in
+                    return a.score > b.score
+                })[..<min(50, result.count)])
+                
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
     }
     
     func loadModels() {
@@ -232,7 +257,7 @@ final class ContentViewModel: @unchecked Sendable {
             guard let dataModel, let classifierModel else {
                 return
             }
-                        
+            
             let clock = ContinuousClock()
             let start = clock.now
             print("Starting Classification")
@@ -247,13 +272,13 @@ final class ContentViewModel: @unchecked Sendable {
             for (i, exercise) in exercises.enumerated() {
                 if let embeddings = dataModel.embedding(exerciseName: exercise.name) {
                     loaded += 1
-                    batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
+                    batch.append(ExerciseContainer(exercise: exercise, embeddings: embeddings))
                 } else {
                     do {
                         let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
                         let embeddings = Embeddings(exerciseName: exercise.name, nameEmbeddings: nameEmbedding)
                         dataModel.save(embeddings: embeddings)
-                        batch.append(ExerciseContainer(exercise: exercise, similarity: 0, embeddings: embeddings))
+                        batch.append(ExerciseContainer(exercise: exercise, embeddings: embeddings))
                     } catch {
                         print(error)
                     }
@@ -314,7 +339,7 @@ extension MLMultiArray {
         let e2 = other.withUnsafeBufferPointer(ofType: Float.self) { ptr in
             Array(ptr)
         }
-
+        
         let sub = zip(e1, e2).map { (a, b) in
             a - b
         }
