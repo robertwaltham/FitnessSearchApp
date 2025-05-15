@@ -38,7 +38,7 @@ kernel void similarity (
 
     float dot_product = 0;
     float input_magnitude = 0;
-    float search_magnitude = 0;
+    float search_magnitude = 0; // TODO: these magnitudes can be cached
     
     for (int i = 0; i < vector_size; i++) {
         dot_product += search[i] * input[i + input_index];

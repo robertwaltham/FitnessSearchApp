@@ -9,7 +9,6 @@ import SwiftUI
 import Observation
 import Combine
 import CoreML
-import SwiftNormalization
 
 struct ContentView: View {
     @State var viewModel: ContentViewModel
@@ -107,6 +106,33 @@ final class ContentViewModel: @unchecked Sendable {
     var query: String = ""
     var queryThrottled: String = ""
     
+    
+    /*
+     Inputs to MobileClip which don't match to anything in the vocabulary set map (at least as I
+     have observed) to the same vector. Because fitness terms tend to be jargon-y they often are
+     not present in the vocabulary set and thus will be classified as this same garbage vector.
+     
+     Search inputs which map towards this vector will return a high degree of similarity to the
+     garbage vector, and often results in the search results being polluted (or a search that should
+     have no results gets 100s of results).
+     
+     The nature of vector embeddings is such that you can add/subtract them, so to filter out these
+     bad results, calculate the vector of a garbage input and subtract that from the search term
+     vector.
+     
+     This does have the problem of permanently filtering any result which doesn't map properly to
+     MobileClips vocabulary.
+     
+     */
+    var garbage: MLMultiArray?
+    let garbageInput = "aaaaaaaaa"
+    func deGarbage(_ input: MLMultiArray) throws -> MLMultiArray {
+        guard let garbage else {
+            fatalError("garbage is requred")
+        }
+        return try input.subtract(other: garbage)
+    }
+    
     struct ExerciseContainer: Identifiable {
         let exercise: Exercise
         let embeddings: Embeddings?
@@ -174,8 +200,12 @@ final class ContentViewModel: @unchecked Sendable {
         
         Task {
             
-            // TODO: wait for inputs to be loaded
             guard let service = await self.shaderService?.get() else {
+                return
+            }
+            
+            guard service.embeddingsCount != 0 else {
+                print("no embeddings")
                 return
             }
             
@@ -193,8 +223,7 @@ final class ContentViewModel: @unchecked Sendable {
             }
             
             let input = try classifierModel.embeddings(text: query)
-            let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
-            let diff = try input.subtract(other: garbage)
+            let diff = try deGarbage(input)
             
             let result = service.search(diff)
             self.result = result.enumerated().filter( { $0.element > 0.09 }).sorted(by: { $0.element > $1.element }).map({ Result(index: $0.offset, score: $0.element)})
@@ -221,9 +250,8 @@ final class ContentViewModel: @unchecked Sendable {
             
             do {
                 let input = try classifierModel.embeddings(text: query)
-                let garbage = try classifierModel.embeddings(text: "aaaaaaaaaa")
-                let diff = try input.subtract(other: garbage)
-                
+                let diff = try deGarbage(input)
+
                 var result = [Result]()
                 for (i, exercise) in exercises.enumerated() {
                     guard let embeddings = exercise.embeddings else {
@@ -295,6 +323,9 @@ final class ContentViewModel: @unchecked Sendable {
                 }
             }
             
+            self.garbage = try classifierModel.embeddings(text: self.garbageInput)
+
+            
             self.exercises.append(contentsOf: batch)
             batch = []
             
@@ -311,6 +342,7 @@ final class ContentViewModel: @unchecked Sendable {
             let embeddings = self.exercises.compactMap {$0.embeddings}.map {$0.nameEmbeddings}
             service.createBuffers(embeddingsCount: self.exercises.count)
             service.copyInput(embeddings: embeddings)
+            
             let shaderDuration = clock.now - start
             print("Ending (took \(shaderDuration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
             
@@ -320,37 +352,4 @@ final class ContentViewModel: @unchecked Sendable {
 
 #Preview {
     ContentView(viewModel: ContentViewModel(testing: true))
-}
-
-extension MLMultiArray {
-    func printContents() {
-        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
-            Array(ptr)
-        }
-        print(e1)
-    }
-    
-    func subtract(other: MLMultiArray) throws -> MLMultiArray {
-        
-        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
-            Array(ptr)
-        }
-        
-        let e2 = other.withUnsafeBufferPointer(ofType: Float.self) { ptr in
-            Array(ptr)
-        }
-        
-        let sub = zip(e1, e2).map { (a, b) in
-            a - b
-        }
-        var normalizer = L1Normalizer<Float>()
-        let normalized = normalizer.normalized(sub)
-        
-        let result = try MLMultiArray(shape: [512], dataType: .float32)
-        for (i, e) in normalized.enumerated() {
-            result[i] = NSNumber(value: e)
-        }
-        
-        return result
-    }
 }

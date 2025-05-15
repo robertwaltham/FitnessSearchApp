@@ -5,6 +5,7 @@
 //  Created by Robert Waltham on 2025-05-12.
 //
 import CoreML
+import SwiftNormalization
 
 final class ClassifierModel: @unchecked Sendable {
     
@@ -64,3 +65,38 @@ final class ClassifierModel: @unchecked Sendable {
         return similarity
     }
 }
+
+
+extension MLMultiArray {
+    func printContents() {
+        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
+            Array(ptr)
+        }
+        print(e1)
+    }
+    
+    func subtract(other: MLMultiArray) throws -> MLMultiArray {
+        
+        let e1 = self.withUnsafeBufferPointer(ofType: Float.self) { ptr in
+            Array(ptr)
+        }
+        
+        let e2 = other.withUnsafeBufferPointer(ofType: Float.self) { ptr in
+            Array(ptr)
+        }
+        
+        let sub = zip(e1, e2).map { (a, b) in
+            a - b
+        }
+        var normalizer = L1Normalizer<Float>()
+        let normalized = normalizer.normalized(sub)
+        
+        let result = try MLMultiArray(shape: [512], dataType: .float32)
+        for (i, e) in normalized.enumerated() {
+            result[i] = NSNumber(value: e)
+        }
+        
+        return result
+    }
+}
+
