@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = D11311562DD2A6D20062B8C4 /* SQLite */; };
 		D193024B2DD3F9BD00B373BC /* SwiftNormalization in Frameworks */ = {isa = PBXBuildFile; productRef = D193024A2DD3F9BD00B373BC /* SwiftNormalization */; };
+		D193024E2DD51D6B00B373BC /* Compute in Frameworks */ = {isa = PBXBuildFile; productRef = D193024D2DD51D6B00B373BC /* Compute */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D193024E2DD51D6B00B373BC /* Compute in Frameworks */,
 				D193024B2DD3F9BD00B373BC /* SwiftNormalization in Frameworks */,
 				D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */,
 			);
@@ -74,6 +76,7 @@
 			packageProductDependencies = (
 				D11311562DD2A6D20062B8C4 /* SQLite */,
 				D193024A2DD3F9BD00B373BC /* SwiftNormalization */,
+				D193024D2DD51D6B00B373BC /* Compute */,
 			);
 			productName = FitnessSearch;
 			productReference = D11311472DD2A6AC0062B8C4 /* FitnessSearch.app */;
@@ -106,6 +109,7 @@
 			packageReferences = (
 				D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */,
 				D19302492DD3F9BD00B373BC /* XCRemoteSwiftPackageReference "SwiftNormalization" */,
+				D193024C2DD51D6B00B373BC /* XCRemoteSwiftPackageReference "Compute" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D11311482DD2A6AC0062B8C4 /* Products */;
@@ -279,6 +283,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				MTL_COMPILER_FLAGS = "-fmetal-enable-logging";
 				PRODUCT_BUNDLE_IDENTIFIER = com.leveltenpaladin.FitnessSearch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -308,6 +313,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				MTL_COMPILER_FLAGS = "-fmetal-enable-logging";
 				PRODUCT_BUNDLE_IDENTIFIER = com.leveltenpaladin.FitnessSearch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -357,6 +363,14 @@
 				minimumVersion = 0.1.0;
 			};
 		};
+		D193024C2DD51D6B00B373BC /* XCRemoteSwiftPackageReference "Compute" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/schwa/Compute";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.5;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -369,6 +383,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D19302492DD3F9BD00B373BC /* XCRemoteSwiftPackageReference "SwiftNormalization" */;
 			productName = SwiftNormalization;
+		};
+		D193024D2DD51D6B00B373BC /* Compute */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D193024C2DD51D6B00B373BC /* XCRemoteSwiftPackageReference "Compute" */;
+			productName = Compute;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

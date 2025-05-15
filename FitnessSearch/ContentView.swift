@@ -38,6 +38,7 @@ struct ContentView: View {
                             searchTextPublisher
                                 .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
                         ) { debouncedSearchText in
+                            viewModel.testShader()
                             viewModel.processQuery()
                         }
                     if viewModel.result.isEmpty {
@@ -88,6 +89,7 @@ struct ContentView: View {
 final class ContentViewModel: @unchecked Sendable {
     var dataModel: AsyncFactory<DataModel>? = nil
     var classifierModel: AsyncFactory<ClassifierModel>? = nil
+    var shaderService: AsyncFactory<ShaderService>? = nil
 
     var dbInitalized = false
     var classifierInitialized = false
@@ -127,6 +129,24 @@ final class ContentViewModel: @unchecked Sendable {
             ClassifierModel()
         }
         
+        self.shaderService = AsyncFactory() {
+            ShaderService()
+        }
+        
+    }
+    
+    func testShader() {
+        Task {
+            guard let service = await self.shaderService?.get() else {
+                return
+            }
+            
+            do {
+                try service.threadGroupTest()
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
     }
     
     func processQuery() {

@@ -1,6 +1,15 @@
 {
-  "originHash" : "6d2fbfac88281869fa7fc9c673fa5fb8d52cf573f8fda1907aa2125ac4a0a7b3",
+  "originHash" : "7d8034c9c4a101d1cd01737c9fb29449cd3d989936e26fc2f60b828446b4aabb",
   "pins" : [
+    {
+      "identity" : "compute",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/schwa/Compute",
+      "state" : {
+        "revision" : "815766d68a04442e37c37ad4b0ab556767ae2178",
+        "version" : "0.0.5"
+      }
+    },
     {
       "identity" : "sqlite.swift",
       "kind" : "remoteSourceControl",
