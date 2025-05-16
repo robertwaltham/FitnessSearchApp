@@ -28,9 +28,9 @@ kernel void threadgroup_test() {
 }
 
 kernel void similarity (
-    device float *input [[buffer (0)]],
-    device float *output [[buffer (1)]],
-    device float *search [[buffer (2)]]
+    device float *input [[buffer (0)]], // Float x 512 x Search Size
+    device float *output [[buffer (1)]], // Float x Search Size
+    device float *search [[buffer (2)]] // Float X 512
 ) {
     uint index = thread_position_in_grid;
     const int vector_size = 512;

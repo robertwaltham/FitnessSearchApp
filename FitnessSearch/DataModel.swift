@@ -93,14 +93,38 @@ extension DataModel {
 
 /*
  CREATE TABLE IF NOT EXISTS "exercises"(
- "exercise" TEXT, "short_video" TEXT, "long_video" TEXT, "difficulty" TEXT,
-  "muscle_group" TEXT, "primary_muscle" TEXT, "secondary_muscle" TEXT, "tertiary_muscle" TEXT,
-  "primary_equipment" TEXT, "primary_item_count" TEXT, "secondary_equipment" TEXT, "secondary_item_count" TEXT,
-  "posture" TEXT, "single_or_double_arm" TEXT, "continuous_or_alternating_arms" TEXT, "grip" TEXT,
-  "load_position_end" TEXT, "continuous_or_alternating_legs" TEXT, "foot_elevation" TEXT, "combination_exercises" TEXT,
-  "movement_pattern_1" TEXT, "movement_pattern_2" TEXT, "movement_pattern_3" TEXT, "plane_of_motion_1" TEXT,
-  "plane_of_motion_2" TEXT, "plane_of_motion_3" TEXT, "body_region" TEXT, "force_type" TEXT,
-  "mechanics" TEXT, "laterality" TEXT, "primary_exercise_classification" TEXT);
+ "exercise" TEXT,
+ "short_video" TEXT,
+ "long_video" TEXT,
+ "difficulty" TEXT,
+ "muscle_group" TEXT,
+ "primary_muscle" TEXT,
+ "secondary_muscle" TEXT,
+ "tertiary_muscle" TEXT,
+ "primary_equipment" TEXT,
+ "primary_item_count" TEXT,
+ "secondary_equipment" TEXT,
+ "secondary_item_count" TEXT,
+ "posture" TEXT,
+ "single_or_double_arm" TEXT,
+ "continuous_or_alternating_arms" TEXT,
+ "grip" TEXT,
+ "load_position_end" TEXT,
+ "continuous_or_alternating_legs" TEXT,
+ "foot_elevation" TEXT,
+ "combination_exercises" TEXT,
+ "movement_pattern_1" TEXT,
+ "movement_pattern_2" TEXT,
+ "movement_pattern_3" TEXT,
+ "plane_of_motion_1" TEXT,
+ "plane_of_motion_2" TEXT,
+ "plane_of_motion_3" TEXT,
+ "body_region" TEXT,
+ "force_type" TEXT,
+ "mechanics" TEXT,
+ "laterality" TEXT,
+ "primary_exercise_classification" TEXT
+ );
  */
 
 struct Exercise: Identifiable {
@@ -134,9 +158,132 @@ struct Exercise: Identifiable {
         Expression<String?>("tertiary_muscle")
     }
     
-    var textToEmbed: String {
-        return "\(name) \(muscleGroup ?? "") \(primaryMuscle ?? "") \(secondaryMuscle ?? "") \(tertiaryMuscle ?? "")"
+    var shortVideo: String?
+    fileprivate static var shortVideoExp: SQLite.Expression<String?> {
+        Expression<String?>("short_video")
     }
+    var longVideo: String?
+    fileprivate static var longVideoExp: SQLite.Expression<String?> {
+        Expression<String?>("long_video")
+    }
+    var difficulty: String?
+    fileprivate static var difficultyExp: SQLite.Expression<String?> {
+        Expression<String?>("difficulty")
+    }
+    var primaryEquipment: String?
+    fileprivate static var primaryEquipmentExp: SQLite.Expression<String?> {
+        Expression<String?>("primary_equipment")
+    }
+    var primaryItemCount: String? // TODO: this should be an int
+    fileprivate static var primaryItemCountExp: SQLite.Expression<String?> {
+        Expression<String?>("primary_item_count")
+    }
+    var secondaryEquipment: String?
+    fileprivate static var secondaryEquipmentExp: SQLite.Expression<String?> {
+        Expression<String?>("secondary_equipment")
+    }
+    var secondaryItemCount: String? // TODO: this should be an int
+    fileprivate static var secondaryItemCountExp: SQLite.Expression<String?> {
+        Expression<String?>("secondary_item_count")
+    }
+    var posture: String?
+    fileprivate static var postureExp: SQLite.Expression<String?> {
+        Expression<String?>("posture")
+    }
+    var singleOrDoubleArm: String? // TODO: this should be an bool
+    fileprivate static var singleOrDoubleArmExp: SQLite.Expression<String?> {
+        Expression<String?>("single_or_double_arm")
+    }
+    var continuousOrAlternatingArms: String? // TODO: this should be an bool
+    fileprivate static var continuousOrAlternatingArmsExp: SQLite.Expression<String?> {
+        Expression<String?>("continuous_or_alternating_arms")
+    }
+    var grip: String?
+    fileprivate static var gripExp: SQLite.Expression<String?> {
+        Expression<String?>("grip")
+    }
+    var loadPositionEnd: String?
+    fileprivate static var loadPositionEndExp: SQLite.Expression<String?> {
+        Expression<String?>("load_position_end")
+    }
+    var continuousOrAlternatingLegs: String?
+    fileprivate static var continuousOrAlternatingLegsExp: SQLite.Expression<String?> {
+        Expression<String?>("continuous_or_alternating_legs")
+    }
+    var footElevation: String?
+    fileprivate static var footElevationExp: SQLite.Expression<String?> {
+        Expression<String?>("foot_elevation")
+    }
+    var combinationExercises: String?
+    fileprivate static var combinationExercisesExp: SQLite.Expression<String?> {
+        Expression<String?>("combination_exercises")
+    }
+    var movementPattern1: String?
+    fileprivate static var movementPattern1Exp: SQLite.Expression<String?> {
+        Expression<String?>("movement_pattern_1")
+    }
+    var movementPattern2: String?
+    fileprivate static var movementPattern2Exp: SQLite.Expression<String?> {
+        Expression<String?>("movement_pattern_2")
+    }
+    var movementPattern3: String?
+    fileprivate static var movementPattern3Exp: SQLite.Expression<String?> {
+        Expression<String?>("movement_pattern_3")
+    }
+    var planeOfMotion1: String?
+    fileprivate static var planeOfMotion1Exp: SQLite.Expression<String?> {
+        Expression<String?>("plane_of_motion_1")
+    }
+    var planeOfMotion2: String?
+    fileprivate static var planeOfMotion2Exp: SQLite.Expression<String?> {
+        Expression<String?>("plane_of_motion_2")
+    }
+    var planeOfMotion3: String?
+    fileprivate static var planeOfMotion3Exp: SQLite.Expression<String?> {
+        Expression<String?>("plane_of_motion_3")
+    }
+    var bodyRegion: String?
+    fileprivate static var bodyRegionExp: SQLite.Expression<String?> {
+        Expression<String?>("body_region")
+    }
+    var forceType: String?
+    fileprivate static var forceTypeExp: SQLite.Expression<String?> {
+        Expression<String?>("force_type")
+    }
+    var mechanics: String?
+    fileprivate static var mechanicsExp: SQLite.Expression<String?> {
+        Expression<String?>("mechanics")
+    }
+    var laterality: String?
+    fileprivate static var lateralityExp: SQLite.Expression<String?> {
+        Expression<String?>("laterality")
+    }
+    var primaryExerciseClassification: String?
+    fileprivate static var primaryExerciseClassificationExp: SQLite.Expression<String?> {
+        Expression<String?>("primary_exercise_classification")
+    }
+    
+    private func _allProperties() -> [String: String] {
+        var result = [String: String]()
+        for child in Mirror(reflecting: self).children {
+            guard let label = child.label else {
+                continue
+            }
+            
+            if let strValue = child.value as? String {
+                result[label] = strValue
+            }
+        }
+        return result
+    }
+    
+    func allProperties(skipName: Bool = true) -> [Property] {
+        return _allProperties()
+            .filter { $0.value.count > 0 }
+            .map { Property(name: $0.key, value: $0.value) }
+            .filter { skipName ? $0.name != "name" : true }
+    }
+    
     
     fileprivate static func table() -> Table {
         return Table("exercises")
@@ -150,6 +297,32 @@ struct Exercise: Identifiable {
                 t.column(primaryMuscleExp)
                 t.column(secondaryMuscleExp)
                 t.column(tertiaryMuscleExp)
+                t.column(bodyRegionExp)
+                t.column(combinationExercisesExp)
+                t.column(continuousOrAlternatingArmsExp)
+                t.column(continuousOrAlternatingLegsExp)
+                t.column(difficultyExp)
+                t.column(footElevationExp)
+                t.column(forceTypeExp)
+                t.column(gripExp)
+                t.column(lateralityExp)
+                t.column(loadPositionEndExp)
+                t.column(longVideoExp)
+                t.column(mechanicsExp)
+                t.column(movementPattern2Exp)
+                t.column(movementPattern3Exp)
+                t.column(movementPattern1Exp)
+                t.column(planeOfMotion2Exp)
+                t.column(planeOfMotion3Exp)
+                t.column(planeOfMotion1Exp)
+                t.column(postureExp)
+                t.column(primaryEquipmentExp)
+                t.column(primaryExerciseClassificationExp)
+                t.column(primaryItemCountExp)
+                t.column(secondaryEquipmentExp)
+                t.column(secondaryItemCountExp)
+                t.column(shortVideoExp)
+                t.column(singleOrDoubleArmExp)
             }
         )
     }
@@ -162,6 +335,33 @@ struct Exercise: Identifiable {
                 Exercise.primaryMuscleExp <- primaryMuscle,
                 Exercise.secondaryMuscleExp <- secondaryMuscle,
                 Exercise.tertiaryMuscleExp <- tertiaryMuscle,
+                Exercise.bodyRegionExp <- bodyRegion,
+                Exercise.combinationExercisesExp <- combinationExercises,
+                Exercise.continuousOrAlternatingArmsExp <- continuousOrAlternatingArms,
+                Exercise.continuousOrAlternatingLegsExp <- continuousOrAlternatingLegs,
+                Exercise.difficultyExp <- difficulty,
+                Exercise.footElevationExp <- footElevation,
+                Exercise.forceTypeExp <- forceType,
+                Exercise.gripExp <- grip,
+                Exercise.lateralityExp <- laterality,
+                Exercise.loadPositionEndExp <- loadPositionEnd,
+                Exercise.longVideoExp <- longVideo,
+                Exercise.mechanicsExp <- mechanics,
+                Exercise.movementPattern2Exp <- movementPattern2,
+                Exercise.movementPattern3Exp <- movementPattern3,
+                Exercise.movementPattern1Exp <- movementPattern1,
+                Exercise.planeOfMotion2Exp <- planeOfMotion2,
+                Exercise.planeOfMotion3Exp <- planeOfMotion3,
+                Exercise.planeOfMotion1Exp <- planeOfMotion1,
+                Exercise.postureExp <- posture,
+                Exercise.primaryEquipmentExp <- primaryEquipment,
+                Exercise.primaryExerciseClassificationExp <- primaryExerciseClassification,
+                Exercise.primaryItemCountExp <- primaryItemCount,
+                Exercise.secondaryEquipmentExp <- secondaryEquipment,
+                Exercise.secondaryItemCountExp <- secondaryItemCount,
+                Exercise.shortVideoExp <- shortVideo,
+                Exercise.singleOrDoubleArmExp <- singleOrDoubleArm,
+
             )
         )
     }
@@ -172,7 +372,34 @@ struct Exercise: Identifiable {
                      muscleGroup: row[muscleGroupExp],
                      primaryMuscle: row[primaryMuscleExp],
                      secondaryMuscle: row[secondaryMuscleExp],
-                     tertiaryMuscle: row[tertiaryMuscleExp])
+                     tertiaryMuscle: row[tertiaryMuscleExp],
+                     shortVideo: row[shortVideoExp],
+                     longVideo: row[longVideoExp],
+                     difficulty: row[difficultyExp],
+                     primaryEquipment: row[primaryEquipmentExp],
+                     primaryItemCount: row[primaryItemCountExp],
+                     secondaryEquipment: row[secondaryEquipmentExp],
+                     secondaryItemCount: row[secondaryItemCountExp],
+                     posture: row[postureExp],
+                     singleOrDoubleArm: row[singleOrDoubleArmExp],
+                     continuousOrAlternatingArms: row[continuousOrAlternatingArmsExp],
+                     grip: row[gripExp],
+                     loadPositionEnd: row[loadPositionEndExp],
+                     continuousOrAlternatingLegs: row[continuousOrAlternatingLegsExp],
+                     footElevation: row[footElevationExp],
+                     combinationExercises: row[combinationExercisesExp],
+                     movementPattern1: row[movementPattern1Exp],
+                     movementPattern2: row[movementPattern2Exp],
+                     movementPattern3: row[movementPattern3Exp],
+                     planeOfMotion1: row[planeOfMotion1Exp],
+                     planeOfMotion2: row[planeOfMotion2Exp],
+                     planeOfMotion3: row[planeOfMotion3Exp],
+                     bodyRegion: row[bodyRegionExp],
+                     forceType: row[forceTypeExp],
+                     mechanics: row[mechanicsExp],
+                     laterality: row[lateralityExp],
+                     primaryExerciseClassification: row[primaryExerciseClassificationExp],
+            )
         }
     }
 }
@@ -256,5 +483,13 @@ extension MLMultiArray: @retroactive Value {
         } catch {
             fatalError("can't save value")
         }
+    }
+}
+
+struct Property: Identifiable {
+    let name: String
+    let value: String
+    var id: String{
+        name
     }
 }

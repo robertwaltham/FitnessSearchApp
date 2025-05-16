@@ -12,6 +12,8 @@ import CoreML
 
 struct ContentView: View {
     @State var viewModel: ContentViewModel
+    @State var presentedExercise: Exercise?
+    
     let searchTextPublisher = PassthroughSubject<String, Never>()
     
     init(viewModel: ContentViewModel = ContentViewModel()) {
@@ -69,25 +71,32 @@ struct ContentView: View {
             
         }
         .padding()
+        .sheet(item: $presentedExercise) { item in
+            VStack {
+                Text(item.name).font(.largeTitle)
+                VStack(alignment: .leading) {
+                    ForEach(item.allProperties()) { property in
+                        HStack {
+                            Text(property.name)
+                            Text(property.value)
+                        }
+                    }
+                }
+            }
+        }
     }
     
     @ViewBuilder
     func exerciseRow(_ exercise: Exercise, similarity: Float? = nil) -> some View {
-        if let similarity {
-            HStack{
-                Text(exercise.name)
-                if let muscleGroup = exercise.muscleGroup {
-                    Text(muscleGroup)
-                }
+        
+        HStack{
+            Text(exercise.name)
+            if let similarity {
                 Text(similarity.formatted(.number.precision(.fractionLength(1...2))))
             }
-        } else {
-            HStack{
-                Text(exercise.name)
-                if let muscleGroup = exercise.muscleGroup {
-                    Text(muscleGroup)
-                }
-            }
+        }
+        .onTapGesture {
+            presentedExercise = exercise
         }
     }
 }
@@ -226,7 +235,11 @@ final class ContentViewModel: @unchecked Sendable {
             let diff = try deGarbage(input)
             
             let result = service.search(diff)
-            self.result = result.enumerated().filter( { $0.element > 0.09 }).sorted(by: { $0.element > $1.element }).map({ Result(index: $0.offset, score: $0.element)})
+            self.result = result
+                .enumerated()
+                .filter( { $0.element > 0.09 })
+                .sorted(by: { $0.element > $1.element })
+                .map({ Result(index: $0.offset, score: $0.element)})
         }
     }
     
