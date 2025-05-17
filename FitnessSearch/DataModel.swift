@@ -286,7 +286,7 @@ struct Exercise: Identifiable {
     
     // TODO: empty values should be nil not ""
     func muscleDescription() -> String {
-        "\(muscleGroup!) \(primaryMuscle!) \(secondaryMuscle!) \(tertiaryMuscle!)"
+        "\(muscleGroup!) \(primaryMuscle!) \(name)"
     }
     
     fileprivate static func table() -> Table {

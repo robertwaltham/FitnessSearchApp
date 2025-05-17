@@ -14,8 +14,11 @@ struct ContentView: View {
     @State var viewModel: ContentViewModel
     @State var presentedExercise: Exercise?
     
-    let searchTextPublisher = PassthroughSubject<String, Never>()
+    nonisolated static let cutoff: Float = 0.01
     
+    let searchTextPublisher = PassthroughSubject<String, Never>()
+    let negativeTextPublisher = PassthroughSubject<String, Never>()
+
     init(viewModel: ContentViewModel = ContentViewModel()) {
         self.viewModel = viewModel
     }
@@ -32,11 +35,24 @@ struct ContentView: View {
                 
                 HStack {
                     TextField("Query", text: $viewModel.query)
+                        .disabled(!viewModel.loaded)
                         .onChange(of: viewModel.query) { oldValue, newValue in
                             searchTextPublisher.send(newValue)
                         }
                         .onReceive(
                             searchTextPublisher
+                                .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+                        ) { debouncedSearchText in
+                            viewModel.processQuery()
+                        }
+                    
+                    TextField("Negative", text: $viewModel.negativeQuery)
+                        .disabled(!viewModel.loaded)
+                        .onChange(of: viewModel.negativeQuery) { oldValue, newValue in
+                            negativeTextPublisher.send(newValue)
+                        }
+                        .onReceive(
+                            negativeTextPublisher
                                 .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
                         ) { debouncedSearchText in
                             viewModel.processQuery()
@@ -51,20 +67,22 @@ struct ContentView: View {
                 .background(Color(white: 0.8))
                 .clipShape(RoundedRectangle(cornerRadius: 5))
                 
-                
-                ScrollView {
-                    LazyVStack(alignment: .leading) {
-                        if viewModel.result.isEmpty {
-                            ForEach(viewModel.exercises) { element in
-                                exerciseRow(element.exercise)
-                            }
-                        } else {
-                            ForEach(viewModel.result) { result in
-                                exerciseRow(viewModel.exercises[result.index].exercise, result: result)
+                if viewModel.loaded {
+                    ScrollView {
+                        LazyVStack(alignment: .leading) {
+                            if viewModel.result.isEmpty {
+                                ForEach(viewModel.exercises) { element in
+                                    exerciseRow(element.exercise)
+                                }
+                            } else {
+                                ForEach(viewModel.result) { result in
+                                    exerciseRow(viewModel.exercises[result.index].exercise, result: result)
+                                }
                             }
                         }
                     }
                 }
+
                 
                 Spacer()
             }
@@ -97,7 +115,7 @@ struct ContentView: View {
                     Text("name \(result.nameScore.formatted(.number.precision(.fractionLength(1...2))))")
                         .foregroundStyle(.green)
                 } else {
-                    Text("muscle \(result.muscleScore.formatted(.number.precision(.fractionLength(1...2))))")
+                    Text("\(exercise.muscleGroup!) \(result.muscleScore.formatted(.number.precision(.fractionLength(1...2))))")
                         .foregroundStyle(.blue)
                 }
             }
@@ -114,13 +132,15 @@ final class ContentViewModel: @unchecked Sendable {
     var classifierModel: AsyncFactory<ClassifierModel>? = nil
     var shaderService: AsyncFactory<ShaderService>? = nil
     
+    var loaded = false
+    
     var dbInitalized = false
     var classifierInitialized = false
     
     var exercises: [ExerciseContainer] = []
     var result: [SearchResult] = []
     var query: String = ""
-    var queryThrottled: String = ""
+    var negativeQuery: String = ""
     
     struct ExerciseContainer: Identifiable {
         let exercise: Exercise
@@ -213,14 +233,20 @@ final class ContentViewModel: @unchecked Sendable {
                 print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
             }
             
-            let input = try classifierModel.embeddings(text: query)
+            var input = try classifierModel.embeddings(text: query)
+            if !negativeQuery.isEmpty {
+                print(classifierModel.tokenizer.tokenize(text: negativeQuery))
+                let negative = try classifierModel.embeddings(text: negativeQuery)
+                input = try input.subtract(other: negative)
+            }
             let nameResult = service.search(input)
             let muscleResult = service.search(input, searchName: false)
-            self.result = zip(nameResult, muscleResult)
+            self.result = Array(zip(nameResult, muscleResult)
                 .enumerated()
-                .filter { max($0.element.0, $0.element.1) > 0.09 }
+                .filter { max($0.element.0, $0.element.1) > ContentView.cutoff }
                 .sorted  { max($0.element.0, $0.element.1) > max($1.element.0, $1.element.1) }
-                .map({ SearchResult(index: $0.offset, nameScore: $0.element.0, muscleScore: $0.element.1)})
+                .map({ SearchResult(index: $0.offset, nameScore: $0.element.0, muscleScore: $0.element.1)})[0..<min(nameResult.count, 100)])
+ 
         }
     }
     
@@ -258,7 +284,7 @@ final class ContentViewModel: @unchecked Sendable {
                 }
                 
                 result = result.filter({ element in
-                    max(element.nameScore, element.muscleScore) > 0.09
+                    max(element.nameScore, element.muscleScore) > ContentView.cutoff
                 })
                 
                 self.result = Array(result.sorted(by: { a, b in
@@ -341,7 +367,7 @@ final class ContentViewModel: @unchecked Sendable {
             
             let shaderDuration = clock.now - start
             print("Ending (took \(shaderDuration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
-            
+            self.loaded = true
         }
     }
 }
