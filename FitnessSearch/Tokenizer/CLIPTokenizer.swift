@@ -62,7 +62,12 @@ class CLIPTokenizer {
         let bpeMergesTxt = try! String(contentsOf: url, encoding: .utf8)
         let arr = bpeMergesTxt.split(separator: "\n").map { String($0) }
         var bpeRanks: [BytePair: Int] = [:]
-        for i in 1 ..< arr.count {
+        
+        // https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py#L67
+        // Clip uses a subset of the byte pair encoding ranks
+        // included clip-vocab uses this range, but clip-merges does not
+        
+        for i in 1 ..< 49152-256-2+1 { //arr.count {
             let tuple = arr[i].split(separator: " ").map { String($0) }
             let bp = BytePair(tuple: tuple)
             bpeRanks[bp] = i - 1
