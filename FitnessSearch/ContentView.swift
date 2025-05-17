@@ -110,12 +110,15 @@ struct ContentView: View {
         HStack{
             Text(exercise.name)
             if let result {
-                if result.nameScore > result.muscleScore {
-                    Text("name \(result.nameScore.formatted(.number.precision(.fractionLength(1...2))))")
+                if result.nameScore == result.maxScore {
+                    Text("name \(result.maxScore.formatted(.number.precision(.fractionLength(1...2))))")
                         .foregroundStyle(.green)
-                } else {
-                    Text("\(exercise.muscleGroup!) \(result.muscleScore.formatted(.number.precision(.fractionLength(1...2))))")
+                } else if result.equpmentScore == result.maxScore {
+                    Text("\(exercise.primaryEquipment!) \(result.maxScore.formatted(.number.precision(.fractionLength(1...2))))")
                         .foregroundStyle(.blue)
+                } else {
+                    Text("\(exercise.muscleGroup!) \(result.maxScore.formatted(.number.precision(.fractionLength(1...2))))")
+                        .foregroundStyle(.purple)
                 }
             }
         }
@@ -171,6 +174,11 @@ final class ContentViewModel: @unchecked Sendable {
         }
         var nameScore: Float
         var muscleScore: Float
+        var equpmentScore: Float
+        
+        var maxScore: Float {
+            max(nameScore, equpmentScore, muscleScore)
+        }
     }
     
     init(testing: Bool = false) {
@@ -255,14 +263,20 @@ final class ContentViewModel: @unchecked Sendable {
             } else {
                 input = try deGarbage(input)
             }
-            let nameResult = service.search(input)
-            let muscleResult = service.search(input, searchName: false)
-            self.result = Array(zip(nameResult, muscleResult)
-                .enumerated()
-                .filter { max($0.element.0, $0.element.1) > ContentView.cutoff }
-                .sorted  { max($0.element.0, $0.element.1) > max($1.element.0, $1.element.1) }
-                .map({ SearchResult(index: $0.offset, nameScore: $0.element.0, muscleScore: $0.element.1)})
-                .prefix(200))
+            let nameResult = service.search(input, type: .name)
+            let muscleResult = service.search(input, type: .muscle)
+            let equipmentResult = service.search(input, type: .equipment)
+            
+            self.result = Array((0..<nameResult.count).map({ i in
+                SearchResult(index: i, nameScore: nameResult[i], muscleScore: muscleResult[i], equpmentScore: equipmentResult[i])
+            })
+            .sorted(by: { a, b in
+                a.maxScore > b.maxScore
+            })
+            .filter({ a in
+                a.maxScore > ContentView.cutoff
+            })
+            .prefix(200))
  
         }
     }
@@ -301,8 +315,9 @@ final class ContentViewModel: @unchecked Sendable {
                     
                     let nameScore = ClassifierModel.cosineSimilarity(input, embeddings.nameEmbeddings)
                     let muscleScore = ClassifierModel.cosineSimilarity(input, embeddings.muscleEmbeddings)
+                    let equipmentScore = ClassifierModel.cosineSimilarity(input, embeddings.equipmentEmbeddings)
 
-                    result.append(SearchResult(index: i, nameScore: nameScore, muscleScore: muscleScore))
+                    result.append(SearchResult(index: i, nameScore: nameScore, muscleScore: muscleScore, equpmentScore: equipmentScore))
                 }
                 
                 result = result.filter({ element in
@@ -347,9 +362,12 @@ final class ContentViewModel: @unchecked Sendable {
                     do {
                         let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
                         let muscleEmbedding = try classifierModel.embeddings(text: exercise.muscleDescription())
+                        let equipmentEmbedding = try classifierModel.embeddings(text: exercise.equipmentDescription())
+
                         let embeddings = Embeddings(exerciseName: exercise.name,
                                                     nameEmbeddings: nameEmbedding,
-                                                    muscleEmbeddings: muscleEmbedding
+                                                    muscleEmbeddings: muscleEmbedding,
+                                                    equipmentEmbeddings: equipmentEmbedding
                         )
                         dataModel.save(embeddings: embeddings)
                         batch.append(ExerciseContainer(exercise: exercise, embeddings: embeddings))
@@ -383,10 +401,13 @@ final class ContentViewModel: @unchecked Sendable {
                 return
             }
             
-            let names = self.exercises.compactMap {$0.embeddings}.map {$0.nameEmbeddings}
-            let muscles = self.exercises.compactMap {$0.embeddings}.map {$0.muscleEmbeddings}
+            let embeddings = self.exercises.compactMap {$0.embeddings}
+            let names = embeddings.map {$0.nameEmbeddings}
+            let muscles = embeddings.map {$0.muscleEmbeddings}
+            let equipment = embeddings.map {$0.equipmentEmbeddings}
+            
             service.createBuffers(embeddingsCount: self.exercises.count)
-            service.copyInput(names: names, muscles: muscles)
+            service.copyInput(names: names, muscles: muscles, equipment: equipment)
             
             let shaderDuration = clock.now - start
             print("Ending (took \(shaderDuration.formatted(.units(allowed: [.seconds, .milliseconds]))))")

@@ -289,6 +289,10 @@ struct Exercise: Identifiable {
         "\(muscleGroup!) \(primaryMuscle!) \(name)"
     }
     
+    func equipmentDescription() -> String {
+        "\(primaryEquipment!) \(secondaryEquipment! == "None" ? "" : secondaryEquipment!)"
+    }
+    
     fileprivate static func table() -> Table {
         return Table("exercises")
     }
@@ -429,12 +433,18 @@ struct Embeddings {
         Expression<MLMultiArray>("muscle_embeddings")
     }
     
+    var equipmentEmbeddings: MLMultiArray
+    fileprivate static var equipmentEmbeddingsExp: SQLite.Expression<MLMultiArray> {
+        Expression<MLMultiArray>("equipment_embeddings")
+    }
+    
     fileprivate static func createTable(db: Connection) throws {
         try db.run(
             table().create(ifNotExists: true) { t in
                 t.column(exerciseNameExp, primaryKey: true)
                 t.column(nameEmbeddingsExp)
                 t.column(muscleEmbeddingsExp)
+                t.column(equipmentEmbeddingsExp)
             }
         )
     }
@@ -444,7 +454,8 @@ struct Embeddings {
             Embeddings.table().insert(or: .replace,
                 Embeddings.exerciseNameExp <- exerciseName,
                 Embeddings.nameEmbeddingsExp <- nameEmbeddings,
-              Embeddings.muscleEmbeddingsExp <- muscleEmbeddings,
+                Embeddings.muscleEmbeddingsExp <- muscleEmbeddings,
+                Embeddings.equipmentEmbeddingsExp <- equipmentEmbeddings,
             )
         )
     }
@@ -453,7 +464,8 @@ struct Embeddings {
         try db.prepare(table().filter(exerciseNameExp == name)).map { row in
             Embeddings(exerciseName: row[exerciseNameExp],
                        nameEmbeddings: row[nameEmbeddingsExp],
-                       muscleEmbeddings: row[muscleEmbeddingsExp]
+                       muscleEmbeddings: row[muscleEmbeddingsExp],
+                       equipmentEmbeddings: row[equipmentEmbeddingsExp]
             )
         }.first
     }
