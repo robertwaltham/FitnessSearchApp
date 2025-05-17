@@ -122,33 +122,6 @@ final class ContentViewModel: @unchecked Sendable {
     var query: String = ""
     var queryThrottled: String = ""
     
-    
-    /*
-     Inputs to MobileClip which don't match to anything in the vocabulary set map (at least as I
-     have observed) to the same vector. Because fitness terms tend to be jargon-y they often are
-     not present in the vocabulary set and thus will be classified as this same garbage vector.
-     
-     Search inputs which map towards this vector will return a high degree of similarity to the
-     garbage vector, and often results in the search results being polluted (or a search that should
-     have no results gets 100s of results).
-     
-     The nature of vector embeddings is such that you can add/subtract them, so to filter out these
-     bad results, calculate the vector of a garbage input and subtract that from the search term
-     vector.
-     
-     This does have the problem of permanently filtering any result which doesn't map properly to
-     MobileClips vocabulary.
-     
-     */
-    var garbage: MLMultiArray?
-    let garbageInput = "aaaaaaaaa"
-    func deGarbage(_ input: MLMultiArray) throws -> MLMultiArray {
-        guard let garbage else {
-            fatalError("garbage is requred")
-        }
-        return try input.subtract(other: garbage)
-    }
-    
     struct ExerciseContainer: Identifiable {
         let exercise: Exercise
         let embeddings: Embeddings?
@@ -241,10 +214,8 @@ final class ContentViewModel: @unchecked Sendable {
             }
             
             let input = try classifierModel.embeddings(text: query)
-            let diff = try deGarbage(input)
-            
-            let nameResult = service.search(diff)
-            let muscleResult = service.search(diff, searchName: false)
+            let nameResult = service.search(input)
+            let muscleResult = service.search(input, searchName: false)
             self.result = zip(nameResult, muscleResult)
                 .enumerated()
                 .filter { max($0.element.0, $0.element.1) > 0.09 }
@@ -273,7 +244,6 @@ final class ContentViewModel: @unchecked Sendable {
             
             do {
                 let input = try classifierModel.embeddings(text: query)
-                let diff = try deGarbage(input)
 
                 var result = [SearchResult]()
                 for (i, exercise) in exercises.enumerated() {
@@ -281,8 +251,8 @@ final class ContentViewModel: @unchecked Sendable {
                         continue
                     }
                     
-                    let nameScore = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
-                    let muscleScore = ClassifierModel.cosineSimilarity(diff, embeddings.muscleEmbeddings)
+                    let nameScore = ClassifierModel.cosineSimilarity(input, embeddings.nameEmbeddings)
+                    let muscleScore = ClassifierModel.cosineSimilarity(input, embeddings.muscleEmbeddings)
 
                     result.append(SearchResult(index: i, nameScore: nameScore, muscleScore: muscleScore))
                 }
@@ -350,9 +320,6 @@ final class ContentViewModel: @unchecked Sendable {
                     batch = []
                 }
             }
-            
-            self.garbage = try classifierModel.embeddings(text: self.garbageInput)
-
             
             self.exercises.append(contentsOf: batch)
             batch = []
