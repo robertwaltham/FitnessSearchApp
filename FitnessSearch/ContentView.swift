@@ -60,7 +60,7 @@ struct ContentView: View {
                             }
                         } else {
                             ForEach(viewModel.result) { result in
-                                exerciseRow(viewModel.exercises[result.index].exercise, similarity: result.score)
+                                exerciseRow(viewModel.exercises[result.index].exercise, result: result)
                             }
                         }
                     }
@@ -87,12 +87,19 @@ struct ContentView: View {
     }
     
     @ViewBuilder
-    func exerciseRow(_ exercise: Exercise, similarity: Float? = nil) -> some View {
+    func exerciseRow(_ exercise: Exercise, result: ContentViewModel.SearchResult? = nil) -> some View {
         
         HStack{
             Text(exercise.name)
-            if let similarity {
-                Text(similarity.formatted(.number.precision(.fractionLength(1...2))))
+            if let result {
+//                Text(similarity.formatted(.number.precision(.fractionLength(1...2))))
+                if result.nameScore > result.muscleScore {
+                    Text("name \(result.nameScore.formatted(.number.precision(.fractionLength(1...2))))")
+                        .foregroundStyle(.green)
+                } else {
+                    Text("muscle \(result.muscleScore.formatted(.number.precision(.fractionLength(1...2))))")
+                        .foregroundStyle(.blue)
+                }
             }
         }
         .onTapGesture {
@@ -111,7 +118,7 @@ final class ContentViewModel: @unchecked Sendable {
     var classifierInitialized = false
     
     var exercises: [ExerciseContainer] = []
-    var result: [Result] = []
+    var result: [SearchResult] = []
     var query: String = ""
     var queryThrottled: String = ""
     
@@ -150,12 +157,13 @@ final class ContentViewModel: @unchecked Sendable {
         }
     }
     
-    struct Result: Identifiable {
+    struct SearchResult: Identifiable {
         let index: Int
         var id: Int {
             index
         }
-        var score: Float
+        var nameScore: Float
+        var muscleScore: Float
     }
     
     init(testing: Bool = false) {
@@ -224,7 +232,8 @@ final class ContentViewModel: @unchecked Sendable {
             
             let clock = ContinuousClock()
             let start = clock.now
-            print("Starting Query")
+            print("Starting Query \(query)")
+            print(classifierModel.tokenizer.tokenize(text: query))
             
             defer {
                 let duration = clock.now - start
@@ -234,12 +243,13 @@ final class ContentViewModel: @unchecked Sendable {
             let input = try classifierModel.embeddings(text: query)
             let diff = try deGarbage(input)
             
-            let result = service.search(diff)
-            self.result = result
+            let nameResult = service.search(diff)
+            let muscleResult = service.search(diff, searchName: false)
+            self.result = zip(nameResult, muscleResult)
                 .enumerated()
-                .filter( { $0.element > 0.09 })
-                .sorted(by: { $0.element > $1.element })
-                .map({ Result(index: $0.offset, score: $0.element)})
+                .filter { max($0.element.0, $0.element.1) > 0.09 }
+                .sorted  { max($0.element.0, $0.element.1) > max($1.element.0, $1.element.1) }
+                .map({ SearchResult(index: $0.offset, nameScore: $0.element.0, muscleScore: $0.element.1)})
         }
     }
     
@@ -265,23 +275,24 @@ final class ContentViewModel: @unchecked Sendable {
                 let input = try classifierModel.embeddings(text: query)
                 let diff = try deGarbage(input)
 
-                var result = [Result]()
+                var result = [SearchResult]()
                 for (i, exercise) in exercises.enumerated() {
                     guard let embeddings = exercise.embeddings else {
                         continue
                     }
                     
-                    let similarity = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
-                    
-                    result.append(Result(index: i, score: similarity))
+                    let nameScore = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
+                    let muscleScore = ClassifierModel.cosineSimilarity(diff, embeddings.muscleEmbeddings)
+
+                    result.append(SearchResult(index: i, nameScore: nameScore, muscleScore: muscleScore))
                 }
                 
                 result = result.filter({ element in
-                    element.score > 0.09
+                    max(element.nameScore, element.muscleScore) > 0.09
                 })
                 
                 self.result = Array(result.sorted(by: { a, b in
-                    return a.score > b.score
+                    return max(a.nameScore, a.muscleScore) > max(a.nameScore, a.muscleScore)
                 })[..<min(50, result.count)])
                 
             } catch {
@@ -317,7 +328,11 @@ final class ContentViewModel: @unchecked Sendable {
                 } else {
                     do {
                         let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
-                        let embeddings = Embeddings(exerciseName: exercise.name, nameEmbeddings: nameEmbedding)
+                        let muscleEmbedding = try classifierModel.embeddings(text: exercise.muscleDescription())
+                        let embeddings = Embeddings(exerciseName: exercise.name,
+                                                    nameEmbeddings: nameEmbedding,
+                                                    muscleEmbeddings: muscleEmbedding
+                        )
                         dataModel.save(embeddings: embeddings)
                         batch.append(ExerciseContainer(exercise: exercise, embeddings: embeddings))
                     } catch {
@@ -352,9 +367,10 @@ final class ContentViewModel: @unchecked Sendable {
                 return
             }
             
-            let embeddings = self.exercises.compactMap {$0.embeddings}.map {$0.nameEmbeddings}
+            let names = self.exercises.compactMap {$0.embeddings}.map {$0.nameEmbeddings}
+            let muscles = self.exercises.compactMap {$0.embeddings}.map {$0.muscleEmbeddings}
             service.createBuffers(embeddingsCount: self.exercises.count)
-            service.copyInput(embeddings: embeddings)
+            service.copyInput(names: names, muscles: muscles)
             
             let shaderDuration = clock.now - start
             print("Ending (took \(shaderDuration.formatted(.units(allowed: [.seconds, .milliseconds]))))")

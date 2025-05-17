@@ -9,17 +9,18 @@ import MetalKit
 import CoreML
 
 class ShaderService: @unchecked Sendable {
-    let compute: Compute
-    let library: ShaderLibrary
-    let device: MTLDevice
+    private let compute: Compute
+    private let library: ShaderLibrary
+    private let device: MTLDevice
     let embeddingsSize = 512 // mobileclip outputs a vector of 512 floats
     
-    var inputBuffer: MTLBuffer?
-    var outputBuffer: MTLBuffer?
-    var searchBuffer: MTLBuffer?
+    private var nameBuffer: MTLBuffer?
+    private var muscleBuffer: MTLBuffer?
+    private var outputBuffer: MTLBuffer?
+    private var searchBuffer: MTLBuffer?
     var embeddingsCount = 0
     
-    var pipeline: Compute.Pipeline?
+    private var pipeline: Compute.Pipeline?
     
     init() {
         do {
@@ -52,7 +53,12 @@ class ShaderService: @unchecked Sendable {
         guard let inputBuffer = device.makeBuffer(length: inputSize) else {
             fatalError("could not create buffer of size \(inputSize)")
         }
-        self.inputBuffer = inputBuffer
+        self.nameBuffer = inputBuffer
+        
+        guard let muscleBuffer = device.makeBuffer(length: inputSize) else {
+            fatalError("could not create buffer of size \(inputSize)")
+        }
+        self.muscleBuffer = muscleBuffer
         
         let outputSize = embeddingsCount * MemoryLayout<Float>.stride
         guard let outputBuffer = device.makeBuffer(length: outputSize) else {
@@ -67,26 +73,32 @@ class ShaderService: @unchecked Sendable {
         self.searchBuffer = searchBuffer
     }
     
-    func copyInput(embeddings: [MLMultiArray]) {
+    func copyInput(names: [MLMultiArray], muscles:[MLMultiArray]) {
         
-        guard let inputBuffer else {
-            fatalError("Buffer must be initalized before use")
+        guard let nameBuffer, let muscleBuffer else {
+            fatalError("Buffers must be initalized before use")
         }
         
-        guard embeddingsCount == embeddings.count else {
+        guard embeddingsCount == names.count, embeddingsCount == muscles.count else {
             fatalError("Embedding count must match")
         }
         
         let embSize = MemoryLayout<Float>.stride * embeddingsSize
         
-        for (i, e) in embeddings.enumerated() {
+        for (i, e) in names.enumerated() {
             _ = e.withUnsafeBytes { ptr in
-                memcpy(inputBuffer.contents() + (i * embSize), ptr.baseAddress, embSize)
+                memcpy(nameBuffer.contents() + (i * embSize), ptr.baseAddress, embSize)
+            }
+        }
+        
+        for (i, e) in muscles.enumerated() {
+            _ = e.withUnsafeBytes { ptr in
+                memcpy(muscleBuffer.contents() + (i * embSize), ptr.baseAddress, embSize)
             }
         }
     }
     
-    func search(_ embedding: MLMultiArray) -> [Float] {
+    func search(_ embedding: MLMultiArray, searchName: Bool = true) -> [Float] {
         do {
             
             if pipeline == nil {
@@ -94,7 +106,7 @@ class ShaderService: @unchecked Sendable {
                 self.pipeline = try compute.makePipeline(function: function)
             }
             
-            guard var pipeline, let inputBuffer, let outputBuffer, let searchBuffer else {
+            guard var pipeline, let nameBuffer, let outputBuffer, let searchBuffer, let muscleBuffer else {
                 fatalError("couldn't create pipeline, or buffers not initalized")
             }
             
@@ -104,7 +116,11 @@ class ShaderService: @unchecked Sendable {
                 memcpy(searchBuffer.contents(), ptr.baseAddress, embSize)
             }
             
-            pipeline.arguments.input = .buffer(inputBuffer)
+            if searchName {
+                pipeline.arguments.input = .buffer(nameBuffer)
+            } else {
+                pipeline.arguments.input = .buffer(muscleBuffer)
+            }
             pipeline.arguments.output = .buffer(outputBuffer)
             pipeline.arguments.search = .buffer(searchBuffer)
             
