@@ -14,7 +14,7 @@ struct ContentView: View {
     @State var viewModel: ContentViewModel
     @State var presentedExercise: Exercise?
     
-    nonisolated static let cutoff: Float = 0.01
+    nonisolated static let cutoff: Float = 0.00
     
     let searchTextPublisher = PassthroughSubject<String, Never>()
     let negativeTextPublisher = PassthroughSubject<String, Never>()
@@ -110,7 +110,6 @@ struct ContentView: View {
         HStack{
             Text(exercise.name)
             if let result {
-//                Text(similarity.formatted(.number.precision(.fractionLength(1...2))))
                 if result.nameScore > result.muscleScore {
                     Text("name \(result.nameScore.formatted(.number.precision(.fractionLength(1...2))))")
                         .foregroundStyle(.green)
@@ -144,21 +143,9 @@ final class ContentViewModel: @unchecked Sendable {
     
     
     /*
-     Inputs to MobileClip which don't match to anything in the vocabulary set map (at least as I
-     have observed) to the same vector. Because fitness terms tend to be jargon-y they often are
-     not present in the vocabulary set and thus will be classified as this same garbage vector.
-     
-     Search inputs which map towards this vector will return a high degree of similarity to the
-     garbage vector, and often results in the search results being polluted (or a search that should
-     have no results gets 100s of results).
-     
-     The nature of vector embeddings is such that you can add/subtract them, so to filter out these
-     bad results, calculate the vector of a garbage input and subtract that from the search term
-     vector.
-     
-     This does have the problem of permanently filtering any result which doesn't map properly to
-     MobileClips vocabulary.
-     
+     Subtracting the embedding vector for a garbage input seems to improve search results. This may be
+     because the search queries for this data often are not well represented in the training set of the
+     model and the embedding vectors are in the space of "unknown".
      */
     var garbage: MLMultiArray?
     let garbageInput = "aaaaaaaaa"
@@ -265,6 +252,8 @@ final class ContentViewModel: @unchecked Sendable {
                 print(classifierModel.tokenizer.tokenize(text: negativeQuery))
                 let negative = try classifierModel.embeddings(text: negativeQuery)
                 input = try input.subtract(other: negative)
+            } else {
+                input = try deGarbage(input)
             }
             let nameResult = service.search(input)
             let muscleResult = service.search(input, searchName: false)
@@ -272,7 +261,8 @@ final class ContentViewModel: @unchecked Sendable {
                 .enumerated()
                 .filter { max($0.element.0, $0.element.1) > ContentView.cutoff }
                 .sorted  { max($0.element.0, $0.element.1) > max($1.element.0, $1.element.1) }
-                .map({ SearchResult(index: $0.offset, nameScore: $0.element.0, muscleScore: $0.element.1)})[0..<min(nameResult.count, 100)])
+                .map({ SearchResult(index: $0.offset, nameScore: $0.element.0, muscleScore: $0.element.1)})
+                .prefix(200))
  
         }
     }
@@ -296,17 +286,21 @@ final class ContentViewModel: @unchecked Sendable {
             }
             
             do {
-                let input = try classifierModel.embeddings(text: query)
-                let diff = try deGarbage(input)
-
+                var input = try classifierModel.embeddings(text: query)
+                input = try deGarbage(input)
+                if !negativeQuery.isEmpty {
+                    let negative = try classifierModel.embeddings(text: negativeQuery)
+                    input = try input.subtract(other: negative)
+                }
+                
                 var result = [SearchResult]()
                 for (i, exercise) in exercises.enumerated() {
                     guard let embeddings = exercise.embeddings else {
                         continue
                     }
                     
-                    let nameScore = ClassifierModel.cosineSimilarity(diff, embeddings.nameEmbeddings)
-                    let muscleScore = ClassifierModel.cosineSimilarity(diff, embeddings.muscleEmbeddings)
+                    let nameScore = ClassifierModel.cosineSimilarity(input, embeddings.nameEmbeddings)
+                    let muscleScore = ClassifierModel.cosineSimilarity(input, embeddings.muscleEmbeddings)
 
                     result.append(SearchResult(index: i, nameScore: nameScore, muscleScore: muscleScore))
                 }
