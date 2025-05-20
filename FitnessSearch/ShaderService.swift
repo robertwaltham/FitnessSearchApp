@@ -15,8 +15,7 @@ class ShaderService: @unchecked Sendable {
     let embeddingsSize = 512 // mobileclip outputs a vector of 512 floats
     
     private var nameBuffer: MTLBuffer?
-    private var muscleBuffer: MTLBuffer?
-    private var equipmentbuffer: MTLBuffer?
+    private var nameBufferJina: MTLBuffer?
     
     private var outputBuffer: MTLBuffer?
     private var searchBuffer: MTLBuffer?
@@ -57,15 +56,10 @@ class ShaderService: @unchecked Sendable {
         }
         self.nameBuffer = inputBuffer
         
-        guard let muscleBuffer = device.makeBuffer(length: inputSize) else {
+        guard let inputBuffer = device.makeBuffer(length: inputSize) else {
             fatalError("could not create buffer of size \(inputSize)")
         }
-        self.muscleBuffer = muscleBuffer
-        
-        guard let equipmentbuffer = device.makeBuffer(length: inputSize) else {
-            fatalError("could not create buffer of size \(inputSize)")
-        }
-        self.equipmentbuffer = equipmentbuffer
+        self.nameBufferJina = inputBuffer
         
         let outputSize = embeddingsCount * MemoryLayout<Float>.stride
         guard let outputBuffer = device.makeBuffer(length: outputSize) else {
@@ -80,13 +74,13 @@ class ShaderService: @unchecked Sendable {
         self.searchBuffer = searchBuffer
     }
     
-    func copyInput(names: [MLMultiArray], muscles: [MLMultiArray], equipment: [MLMultiArray]) {
+    func copyInput(names: [MLMultiArray], namesJina: [MLMultiArray]) {
         
-        guard let nameBuffer, let muscleBuffer, let equipmentbuffer else {
+        guard let nameBuffer, let nameBufferJina else {
             fatalError("Buffers must be initalized before use")
         }
         
-        guard embeddingsCount == names.count, embeddingsCount == muscles.count else {
+        guard embeddingsCount == names.count else {
             fatalError("Embedding count must match")
         }
         
@@ -98,23 +92,16 @@ class ShaderService: @unchecked Sendable {
             }
         }
         
-        for (i, e) in muscles.enumerated() {
+        for (i, e) in namesJina.enumerated() {
             _ = e.withUnsafeBytes { ptr in
-                memcpy(muscleBuffer.contents() + (i * embSize), ptr.baseAddress, embSize)
-            }
-        }
-        
-        for (i, e) in equipment.enumerated() {
-            _ = e.withUnsafeBytes { ptr in
-                memcpy(equipmentbuffer.contents() + (i * embSize), ptr.baseAddress, embSize)
+                memcpy(nameBufferJina.contents() + (i * embSize), ptr.baseAddress, embSize)
             }
         }
     }
     
     enum SearchType {
         case name
-        case muscle
-        case equipment
+        case nameJina
     }
     
     func search(_ embedding: MLMultiArray, type: SearchType) -> [Float] {
@@ -125,7 +112,7 @@ class ShaderService: @unchecked Sendable {
                 self.pipeline = try compute.makePipeline(function: function)
             }
             
-            guard var pipeline, let nameBuffer, let outputBuffer, let searchBuffer, let muscleBuffer, let equipmentbuffer else {
+            guard var pipeline, let nameBuffer, let nameBufferJina, let outputBuffer, let searchBuffer else {
                 fatalError("couldn't create pipeline, or buffers not initalized")
             }
             
@@ -139,10 +126,8 @@ class ShaderService: @unchecked Sendable {
                 
             case .name:
                 pipeline.arguments.input = .buffer(nameBuffer)
-            case .muscle:
-                pipeline.arguments.input = .buffer(muscleBuffer)
-            case .equipment:
-                pipeline.arguments.input = .buffer(equipmentbuffer)
+            case .nameJina:
+                pipeline.arguments.input = .buffer(nameBufferJina)
             }
 
             pipeline.arguments.output = .buffer(outputBuffer)

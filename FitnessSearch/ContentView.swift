@@ -45,18 +45,9 @@ struct ContentView: View {
                         ) { debouncedSearchText in
                             viewModel.processQuery()
                         }
-                    
-                    TextField("Negative", text: $viewModel.negativeQuery)
-                        .disabled(!viewModel.loaded)
-                        .onChange(of: viewModel.negativeQuery) { oldValue, newValue in
-                            negativeTextPublisher.send(newValue)
-                        }
-                        .onReceive(
-                            negativeTextPublisher
-                                .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-                        ) { debouncedSearchText in
-                            viewModel.processQuery()
-                        }
+                    Toggle(viewModel.useJinaModel ? "Jina" : "MobileCLIP", isOn: $viewModel.useJinaModel)
+                        .frame(maxWidth: 200)
+
                     if viewModel.result.isEmpty {
                         Text(viewModel.exercises.count.description)
                     } else {
@@ -109,16 +100,16 @@ struct ContentView: View {
         
         HStack{
             Text(exercise.name)
+            Text(exercise.muscleGroup!)
+                .foregroundStyle(.purple)
+
             if let result {
-                if result.nameScore == result.maxScore {
-                    Text("name \(result.maxScore.formatted(.number.precision(.fractionLength(1...2))))")
+                if viewModel.useJinaModel {
+                    Text("\(result.nameJinaScore.formatted(.number.precision(.fractionLength(1...2))))")
                         .foregroundStyle(.green)
-                } else if result.equpmentScore == result.maxScore {
-                    Text("\(exercise.primaryEquipment!) \(result.maxScore.formatted(.number.precision(.fractionLength(1...2))))")
-                        .foregroundStyle(.blue)
                 } else {
-                    Text("\(exercise.muscleGroup!) \(result.maxScore.formatted(.number.precision(.fractionLength(1...2))))")
-                        .foregroundStyle(.purple)
+                    Text("\(result.nameScore.formatted(.number.precision(.fractionLength(1...2))))")
+                        .foregroundStyle(.blue)
                 }
             }
         }
@@ -144,6 +135,7 @@ final class ContentViewModel: @unchecked Sendable {
     var query: String = ""
     var negativeQuery: String = ""
     
+    var useJinaModel = false
     
     /*
      Subtracting the embedding vector for a garbage input seems to improve search results. This may be
@@ -173,11 +165,9 @@ final class ContentViewModel: @unchecked Sendable {
             index
         }
         var nameScore: Float
-        var muscleScore: Float
-        var equpmentScore: Float
-        
+        var nameJinaScore: Float
         var maxScore: Float {
-            max(nameScore, equpmentScore, muscleScore)
+            max(nameScore, nameJinaScore)
         }
     }
     
@@ -248,92 +238,31 @@ final class ContentViewModel: @unchecked Sendable {
             let clock = ContinuousClock()
             let start = clock.now
             print("Starting Query \(query)")
-            print(classifierModel.tokenizer.tokenize(text: query))
             
             defer {
                 let duration = clock.now - start
                 print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
             }
             
-            var input = try classifierModel.embeddings(text: query)
-            if !negativeQuery.isEmpty {
-                print(classifierModel.tokenizer.tokenize(text: negativeQuery))
-                let negative = try classifierModel.embeddings(text: negativeQuery)
-                input = try input.subtract(other: negative)
-            } else {
-                input = try deGarbage(input)
-            }
+            let input = try classifierModel.embeddings(text: query)
+            let inputJina = try classifierModel.vector(text: query)
+
             let nameResult = service.search(input, type: .name)
-            let muscleResult = service.search(input, type: .muscle)
-            let equipmentResult = service.search(input, type: .equipment)
+            let nameJinaResult = service.search(inputJina, type: .nameJina)
             
             self.result = Array((0..<nameResult.count).map({ i in
-                SearchResult(index: i, nameScore: nameResult[i], muscleScore: muscleResult[i], equpmentScore: equipmentResult[i])
+                SearchResult(index: i, nameScore: nameResult[i], nameJinaScore: nameJinaResult[i])
             })
             .sorted(by: { a, b in
-                a.maxScore > b.maxScore
+                useJinaModel ? a.nameJinaScore > b.nameJinaScore : a.nameScore > b.nameScore
             })
             .filter({ a in
                 a.maxScore > ContentView.cutoff
             })
             .prefix(200))
- 
         }
     }
-    
-    // search using cpu
-    
-    func processQuerySlow() {
-        Task {
-            
-            guard let classifierModel = await classifierModel?.get() else {
-                return
-            }
-            
-            let clock = ContinuousClock()
-            let start = clock.now
-            print("Starting Query")
-            
-            defer {
-                let duration = clock.now - start
-                print("Ending Query (took \(duration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
-            }
-            
-            do {
-                var input = try classifierModel.embeddings(text: query)
-                input = try deGarbage(input)
-                if !negativeQuery.isEmpty {
-                    let negative = try classifierModel.embeddings(text: negativeQuery)
-                    input = try input.subtract(other: negative)
-                }
-                
-                var result = [SearchResult]()
-                for (i, exercise) in exercises.enumerated() {
-                    guard let embeddings = exercise.embeddings else {
-                        continue
-                    }
-                    
-                    let nameScore = ClassifierModel.cosineSimilarity(input, embeddings.nameEmbeddings)
-                    let muscleScore = ClassifierModel.cosineSimilarity(input, embeddings.muscleEmbeddings)
-                    let equipmentScore = ClassifierModel.cosineSimilarity(input, embeddings.equipmentEmbeddings)
 
-                    result.append(SearchResult(index: i, nameScore: nameScore, muscleScore: muscleScore, equpmentScore: equipmentScore))
-                }
-                
-                result = result.filter({ element in
-                    max(element.nameScore, element.muscleScore) > ContentView.cutoff
-                })
-                
-                self.result = Array(result.sorted(by: { a, b in
-                    return max(a.nameScore, a.muscleScore) > max(a.nameScore, a.muscleScore)
-                })[..<min(50, result.count)])
-                
-            } catch {
-                print(error.localizedDescription)
-            }
-        }
-    }
-    
     func loadModels() {
         Task.detached {
             let dataModel = await self.dataModel?.get()
@@ -360,15 +289,12 @@ final class ContentViewModel: @unchecked Sendable {
                     batch.append(ExerciseContainer(exercise: exercise, embeddings: embeddings))
                 } else {
                     do {
-                        let nameEmbedding = try classifierModel.embeddings(text: exercise.name)
-                        let muscleEmbedding = try classifierModel.embeddings(text: exercise.muscleDescription())
-                        let equipmentEmbedding = try classifierModel.embeddings(text: exercise.equipmentDescription())
+                        let nameEmbedding = try classifierModel.embeddings(text: exercise.nameDescription())
+                        let nameJinaEmbedding = try classifierModel.vector(text: exercise.nameDescription())
 
                         let embeddings = Embeddings(exerciseName: exercise.name,
                                                     nameEmbeddings: nameEmbedding,
-                                                    muscleEmbeddings: muscleEmbedding,
-                                                    equipmentEmbeddings: equipmentEmbedding
-                        )
+                                                    nameEmbeddingsJina: nameJinaEmbedding)
                         dataModel.save(embeddings: embeddings)
                         batch.append(ExerciseContainer(exercise: exercise, embeddings: embeddings))
                     } catch {
@@ -403,11 +329,10 @@ final class ContentViewModel: @unchecked Sendable {
             
             let embeddings = self.exercises.compactMap {$0.embeddings}
             let names = embeddings.map {$0.nameEmbeddings}
-            let muscles = embeddings.map {$0.muscleEmbeddings}
-            let equipment = embeddings.map {$0.equipmentEmbeddings}
+            let namesJina = embeddings.map {$0.nameEmbeddingsJina}
             
             service.createBuffers(embeddingsCount: self.exercises.count)
-            service.copyInput(names: names, muscles: muscles, equipment: equipment)
+            service.copyInput(names: names, namesJina: namesJina)
             
             let shaderDuration = clock.now - start
             print("Ending (took \(shaderDuration.formatted(.units(allowed: [.seconds, .milliseconds]))))")

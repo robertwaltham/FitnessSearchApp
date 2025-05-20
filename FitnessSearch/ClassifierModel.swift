@@ -6,24 +6,66 @@
 //
 import CoreML
 import SwiftNormalization
+import Tokenizers
+import Hub
 
 final class ClassifierModel: @unchecked Sendable {
     
-//    let textEncoder: mobileclip_s0_text
+    // https://huggingface.co/apple/coreml-mobileclip
     let textEncoder: mobileclip_blt_text
     let tokenizer: CLIPTokenizer
     
+    // https://huggingface.co/jinaai/jina-embeddings-v2-small-en
+    let vectorModel: float32_model
+    let vectorTokenizer: any Tokenizer
+    let vectorInputTokenCount = 128
+    
     init() {
         do {
-//            try textEncoder = mobileclip_s0_text()
             try textEncoder = mobileclip_blt_text()
             tokenizer = CLIPTokenizer()
+            
+            try vectorModel = float32_model()
+            guard let config = try ClassifierModel.readConfig(name: "tokenizer_config"),
+                    let data = try ClassifierModel.readConfig(name: "tokenizer") else {
+                fatalError("no config found")
+            }
+            vectorTokenizer = try AutoTokenizer.from(tokenizerConfig: config, tokenizerData: data)
         } catch {
             fatalError(error.localizedDescription)
         }
     }
     
-    func encode(text: MLMultiArray) throws -> MLMultiArray {
+    // adapted from
+    // https://github.com/couchbaselabs/mobile-testapps/blob/f09f8497c445380009063f7348f5ef54af6bac6d/CBLClient/Apps/CBLTestServer-iOS/CBLTestServer-iOS/Server/VectorSearchRequestHandler.swift#L263
+    
+    private func tokenize(text: String) throws -> float32_modelInput {
+        let tokenized = vectorTokenizer.encode(text: text)
+        let empty = Array<Int>(repeating: 0, count: vectorInputTokenCount - tokenized.count)
+        let padded = tokenized + empty
+        let tokenizedMaskMultiArray = try MLMultiArray(shape: [1, NSNumber(value: vectorInputTokenCount)], dataType: .int32)
+        for (i, v) in padded.enumerated() {
+            tokenizedMaskMultiArray[i] = NSNumber(value: v)
+        }
+        
+        let attentionMask = padded.map { v in
+            v > 0 ? 1 : 0
+        }
+        let attentionMaskMultiArray = try MLMultiArray(shape: [1, NSNumber(value: vectorInputTokenCount)], dataType: .int32)
+        for (i, v) in attentionMask.enumerated() {
+            attentionMaskMultiArray[i] = NSNumber(value: v)
+        }
+        
+        return float32_modelInput(input_ids: tokenizedMaskMultiArray, attention_mask: attentionMaskMultiArray)
+    }
+    
+    func vector(text: String) throws -> MLMultiArray {
+        let inputs = try tokenize(text: text)
+        let prediction = try vectorModel.prediction(input: inputs)
+        return prediction.pooler_output
+    }
+    
+    private func encode(text: MLMultiArray) throws -> MLMultiArray {
         try textEncoder.prediction(text: text).final_emb_1
     }
     
@@ -63,6 +105,17 @@ final class ClassifierModel: @unchecked Sendable {
         // Get the cosine similarity
         let similarity = dotProduct / (magnitude1 * magnitude2)
         return similarity
+    }
+    
+    private static func readConfig(name: String) throws -> Config? {
+        if let url = Bundle.main.url(forResource: name, withExtension: "json") {
+            let data = try Data(contentsOf: url, options: .mappedIfSafe)
+            let jsonResult = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves)
+            if let jsonDict = jsonResult as? [NSString: Any] {
+                return Config(jsonDict)
+            }
+        }
+        return nil
     }
 }
 

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = D11311562DD2A6D20062B8C4 /* SQLite */; };
+		D15C08A22DDD16E400F40159 /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = D15C08A12DDD16E400F40159 /* Transformers */; };
 		D193024B2DD3F9BD00B373BC /* SwiftNormalization in Frameworks */ = {isa = PBXBuildFile; productRef = D193024A2DD3F9BD00B373BC /* SwiftNormalization */; };
 		D193024E2DD51D6B00B373BC /* Compute in Frameworks */ = {isa = PBXBuildFile; productRef = D193024D2DD51D6B00B373BC /* Compute */; };
 /* End PBXBuildFile section */
@@ -31,6 +32,7 @@
 			files = (
 				D193024E2DD51D6B00B373BC /* Compute in Frameworks */,
 				D193024B2DD3F9BD00B373BC /* SwiftNormalization in Frameworks */,
+				D15C08A22DDD16E400F40159 /* Transformers in Frameworks */,
 				D11311572DD2A6D20062B8C4 /* SQLite in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -77,6 +79,7 @@
 				D11311562DD2A6D20062B8C4 /* SQLite */,
 				D193024A2DD3F9BD00B373BC /* SwiftNormalization */,
 				D193024D2DD51D6B00B373BC /* Compute */,
+				D15C08A12DDD16E400F40159 /* Transformers */,
 			);
 			productName = FitnessSearch;
 			productReference = D11311472DD2A6AC0062B8C4 /* FitnessSearch.app */;
@@ -110,6 +113,7 @@
 				D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */,
 				D19302492DD3F9BD00B373BC /* XCRemoteSwiftPackageReference "SwiftNormalization" */,
 				D193024C2DD51D6B00B373BC /* XCRemoteSwiftPackageReference "Compute" */,
+				D15C08A02DDD16E400F40159 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D11311482DD2A6AC0062B8C4 /* Products */;
@@ -355,6 +359,14 @@
 				minimumVersion = 0.15.3;
 			};
 		};
+		D15C08A02DDD16E400F40159 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-transformers";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.20;
+			};
+		};
 		D19302492DD3F9BD00B373BC /* XCRemoteSwiftPackageReference "SwiftNormalization" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/JacopoMangiavacchi/SwiftNormalization";
@@ -378,6 +390,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D11311552DD2A6D20062B8C4 /* XCRemoteSwiftPackageReference "SQLite" */;
 			productName = SQLite;
+		};
+		D15C08A12DDD16E400F40159 /* Transformers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D15C08A02DDD16E400F40159 /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Transformers;
 		};
 		D193024A2DD3F9BD00B373BC /* SwiftNormalization */ = {
 			isa = XCSwiftPackageProductDependency;

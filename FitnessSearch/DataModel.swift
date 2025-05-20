@@ -293,6 +293,10 @@ struct Exercise: Identifiable {
         "\(primaryEquipment!) \(secondaryEquipment! == "None" ? "" : secondaryEquipment!)"
     }
     
+    func nameDescription() -> String {
+        "\(name) \(muscleGroup!) \(primaryMuscle!)"
+    }
+    
     fileprivate static func table() -> Table {
         return Table("exercises")
     }
@@ -428,14 +432,9 @@ struct Embeddings {
         Expression<MLMultiArray>("exercise_embeddings")
     }
     
-    var muscleEmbeddings: MLMultiArray
-    fileprivate static var muscleEmbeddingsExp: SQLite.Expression<MLMultiArray> {
-        Expression<MLMultiArray>("muscle_embeddings")
-    }
-    
-    var equipmentEmbeddings: MLMultiArray
-    fileprivate static var equipmentEmbeddingsExp: SQLite.Expression<MLMultiArray> {
-        Expression<MLMultiArray>("equipment_embeddings")
+    var nameEmbeddingsJina: MLMultiArray
+    fileprivate static var nameEmbeddingsJinaExp: SQLite.Expression<MLMultiArray> {
+        Expression<MLMultiArray>("exercise_jina_embeddings")
     }
     
     fileprivate static func createTable(db: Connection) throws {
@@ -443,8 +442,7 @@ struct Embeddings {
             table().create(ifNotExists: true) { t in
                 t.column(exerciseNameExp, primaryKey: true)
                 t.column(nameEmbeddingsExp)
-                t.column(muscleEmbeddingsExp)
-                t.column(equipmentEmbeddingsExp)
+                t.column(nameEmbeddingsJinaExp)
             }
         )
     }
@@ -454,8 +452,7 @@ struct Embeddings {
             Embeddings.table().insert(or: .replace,
                 Embeddings.exerciseNameExp <- exerciseName,
                 Embeddings.nameEmbeddingsExp <- nameEmbeddings,
-                Embeddings.muscleEmbeddingsExp <- muscleEmbeddings,
-                Embeddings.equipmentEmbeddingsExp <- equipmentEmbeddings,
+                Embeddings.nameEmbeddingsJinaExp <- nameEmbeddingsJina
             )
         )
     }
@@ -464,8 +461,7 @@ struct Embeddings {
         try db.prepare(table().filter(exerciseNameExp == name)).map { row in
             Embeddings(exerciseName: row[exerciseNameExp],
                        nameEmbeddings: row[nameEmbeddingsExp],
-                       muscleEmbeddings: row[muscleEmbeddingsExp],
-                       equipmentEmbeddings: row[equipmentEmbeddingsExp]
+                       nameEmbeddingsJina: row[nameEmbeddingsJinaExp]
             )
         }.first
     }
