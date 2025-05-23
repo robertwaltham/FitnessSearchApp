@@ -13,7 +13,8 @@ import CoreML
 struct ContentView: View {
     @State var viewModel: ContentViewModel
     @State var presentedExercise: Exercise?
-    
+    let userInterfaceIdiom: UIUserInterfaceIdiom
+
     nonisolated static let cutoff: Float = 0.00
     
     let searchTextPublisher = PassthroughSubject<String, Never>()
@@ -21,6 +22,7 @@ struct ContentView: View {
 
     init(viewModel: ContentViewModel = ContentViewModel()) {
         self.viewModel = viewModel
+        self.userInterfaceIdiom = UIDevice.current.userInterfaceIdiom
     }
     
     var body: some View {
@@ -41,12 +43,12 @@ struct ContentView: View {
                         }
                         .onReceive(
                             searchTextPublisher
-                                .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+                                .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
                         ) { debouncedSearchText in
                             viewModel.processQuery()
                         }
-                    Toggle(viewModel.useJinaModel ? "Jina" : "MobileCLIP", isOn: $viewModel.useJinaModel)
-                        .frame(maxWidth: 200)
+                    Toggle(viewModel.useJinaModel ? "Jina" : "CLIP", isOn: $viewModel.useJinaModel)
+                        .frame(maxWidth: 150)
 
                     if viewModel.result.isEmpty {
                         Text(viewModel.exercises.count.description)
@@ -73,7 +75,6 @@ struct ContentView: View {
                         }
                     }
                 }
-
                 
                 Spacer()
             }
@@ -98,21 +99,38 @@ struct ContentView: View {
     @ViewBuilder
     func exerciseRow(_ exercise: Exercise, result: ContentViewModel.SearchResult? = nil) -> some View {
         
-        HStack{
-            Text(exercise.name)
-            Text(exercise.muscleGroup!)
-                .foregroundStyle(.purple)
-
-            if let result {
-                if viewModel.useJinaModel {
-                    Text("\(result.nameJinaScore.formatted(.number.precision(.fractionLength(1...2))))")
-                        .foregroundStyle(.green)
-                } else {
-                    Text("\(result.nameScore.formatted(.number.precision(.fractionLength(1...2))))")
-                        .foregroundStyle(.blue)
+        VStack(alignment: .leading) {
+            HStack {
+                Text(exercise.name)
+                    .font(.headline)
+                if let result {
+                    Text(result.formattedResult(useJinaScore: viewModel.useJinaModel))
+                        .foregroundStyle(.yellow)
                 }
             }
+            
+            let font: Font = userInterfaceIdiom == .phone ? .caption : .body
+            HStack {
+                Text(exercise.muscleGroup!)
+                    .foregroundStyle(.purple)
+                
+                Text(exercise.primaryMuscle!)
+                    .foregroundStyle(.blue)
+                
+                if !exercise.secondaryMuscle!.isEmpty {
+                    Text(exercise.secondaryMuscle!)
+                        .foregroundStyle(.green)
+                }
+                
+                Text(exercise.primaryEquipment!)
+                    .foregroundStyle(.purple)
+                
+                Text(exercise.difficulty!)
+                    .foregroundStyle(.blue)
+            }
+            .font(font)
         }
+        .padding(EdgeInsets(top: 5, leading: 5, bottom: 0, trailing: 0))
         .onTapGesture {
             presentedExercise = exercise
         }
@@ -135,7 +153,7 @@ final class ContentViewModel: @unchecked Sendable {
     var query: String = ""
     var negativeQuery: String = ""
     
-    var useJinaModel = false
+    var useJinaModel = true
     
     /*
      Subtracting the embedding vector for a garbage input seems to improve search results. This may be
@@ -168,6 +186,14 @@ final class ContentViewModel: @unchecked Sendable {
         var nameJinaScore: Float
         var maxScore: Float {
             max(nameScore, nameJinaScore)
+        }
+        
+        func formattedResult(useJinaScore: Bool) -> String {
+            if useJinaScore {
+                return nameJinaScore.formatted(.number.precision(.fractionLength(1...2)))
+            } else {
+                return nameScore.formatted(.number.precision(.fractionLength(1...2)))
+            }
         }
     }
     
@@ -334,7 +360,7 @@ final class ContentViewModel: @unchecked Sendable {
             service.createBuffers(embeddingsCount: self.exercises.count)
             service.copyInput(names: names, namesJina: namesJina)
             
-            let shaderDuration = clock.now - start
+            let shaderDuration = clock.now - batchStart
             print("Ending (took \(shaderDuration.formatted(.units(allowed: [.seconds, .milliseconds]))))")
             self.loaded = true
         }

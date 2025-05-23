@@ -294,7 +294,7 @@ struct Exercise: Identifiable {
     }
     
     func nameDescription() -> String {
-        "\(name) \(muscleGroup!) \(primaryMuscle!)"
+        "\(name) \(muscleGroup!) \(primaryMuscle!) \(equipmentDescription()) \(difficulty!)"
     }
     
     fileprivate static func table() -> Table {
