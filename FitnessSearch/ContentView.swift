@@ -82,17 +82,7 @@ struct ContentView: View {
         }
         .padding()
         .sheet(item: $presentedExercise) { item in
-            VStack {
-                Text(item.name).font(.largeTitle)
-                VStack(alignment: .leading) {
-                    ForEach(item.allProperties()) { property in
-                        HStack {
-                            Text(property.name)
-                            Text(property.value)
-                        }
-                    }
-                }
-            }
+            ExerciseDetailView(item: item)
         }
     }
     
